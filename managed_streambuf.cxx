@@ -59,6 +59,14 @@ class managed_streambuf final : public std::streambuf {
                this->buffer_.data() + this->buffer_.size() - 1);
   }
 
+  ~managed_streambuf() override {
+    try {
+      sync();
+    } catch (...) {
+      // ignore
+    }
+  }
+
  private:
   int_type overflow(const int_type i) override {
     if (!traits_type::eq_int_type(i, traits_type::eof())) {
@@ -122,12 +130,22 @@ CXX11_SHARP_EXPORT void delete_managed_streambuf(std_streambuf* streambuf) {
   delete reinterpret_cast<managed_streambuf*>(streambuf);
 }
 
-CXX11_SHARP_EXPORT void copy_to_managed_streambuf(
-    std_streambuf* src_streambuf, std_streambuf* dst_streambuf) {
-  std::streambuf* src = reinterpret_cast<std::streambuf*>(src_streambuf);
-  std::streambuf* dst = reinterpret_cast<std::streambuf*>(dst_streambuf);
-  std::ostream os(dst);
-  os << src;
-  os.flush();
+/* bool is non-blittable type, do not use in API
+ * https://learn.microsoft.com/en-us/dotnet/framework/interop/blittable-and-non-blittable-types
+ * https://stackoverflow.com/questions/4608876/c-sharp-dllimport-with-c-boolean-function-not-returning-correctly
+ */
+CXX11_SHARP_EXPORT int copy_to_managed_streambuf(std_streambuf* src_streambuf,
+                                                 std_streambuf* dst_streambuf) {
+  try {
+    std::streambuf* src = reinterpret_cast<std::streambuf*>(src_streambuf);
+    std::streambuf* dst = reinterpret_cast<std::streambuf*>(dst_streambuf);
+    std::ostream os(dst);
+    os << src;
+    os.flush();
+    // std::cout.exceptions ( std::ios::failbit | std::ios::badbit );
+    return os.good() ? 0 : 1;  // no-error
+  } catch (...) {
+    return 1;
+  }
 }
 }
