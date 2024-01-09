@@ -59,13 +59,7 @@ class managed_streambuf final : public std::streambuf {
                this->buffer_.data() + this->buffer_.size() - 1);
   }
 
-  ~managed_streambuf() override {
-    try {
-      sync();
-    } catch (...) {
-      // ignore
-    }
-  }
+  ~managed_streambuf() override { sync(); }
 
  private:
   int_type overflow(const int_type i) override {
@@ -91,23 +85,23 @@ class managed_streambuf final : public std::streambuf {
     const int num = static_cast<int>(pptr() - pbase());
     const int size = this->buffer_.write(num);
     if (size < 0) {
-      throw std::runtime_error("invalid write");
+      return false;
     }
     return size == num;
   }
 
-  int underflow() override {
+  int_type underflow() override {
     if (this->gptr() == this->egptr()) {
       const int size = this->buffer_.read();
       if (size < 0) {
-        throw std::runtime_error("invalid read");
+        return traits_type::eof();
       }
       this->setg(this->buffer_.data(), this->buffer_.data(),
                  this->buffer_.data() + size);
     }
     return this->gptr() == this->egptr()
-               ? std::char_traits<char>::eof()
-               : std::char_traits<char>::to_int_type(*this->gptr());
+               ? traits_type::eof()
+               : traits_type::to_int_type(*this->gptr());
   }
 };
 }  // namespace
@@ -136,16 +130,14 @@ CXX11_SHARP_EXPORT void delete_managed_streambuf(std_streambuf* streambuf) {
  */
 CXX11_SHARP_EXPORT int copy_to_managed_streambuf(std_streambuf* src_streambuf,
                                                  std_streambuf* dst_streambuf) {
-  try {
-    std::streambuf* src = reinterpret_cast<std::streambuf*>(src_streambuf);
-    std::streambuf* dst = reinterpret_cast<std::streambuf*>(dst_streambuf);
-    std::ostream os(dst);
-    os << src;
-    os.flush();
-    // std::cout.exceptions ( std::ios::failbit | std::ios::badbit );
-    return os.good() ? 0 : 1;  // no-error
-  } catch (...) {
-    return 1;
-  }
+  std::streambuf* src = reinterpret_cast<std::streambuf*>(src_streambuf);
+  std::streambuf* dst = reinterpret_cast<std::streambuf*>(dst_streambuf);
+  std::ostream os(dst);
+  // os.exceptions ( std::ios::failbit | std::ios::badbit );
+  os << src;
+  os.flush();
+  int n = os.tellp();
+
+  return os.good() ? 0 : -1;
 }
 }
