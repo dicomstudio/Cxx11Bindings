@@ -1,15 +1,6 @@
-#include <iostream>
+#include "public.h"
 
-#ifdef __GNUC__
-#define CXX11_SHARP_EXPORT __attribute__((visibility("default")))
-#else
-#define CXX11_SHARP_EXPORT __declspec(dllexport)
-#endif
-
-extern "C" {
-typedef int (*read_func)();
-typedef int (*write_func)(int);
-}
+#include <iostream>  // FIXME: streambuf
 
 namespace {
 /* managed buffer API for system.io.stream. No allocation done, simply provide
@@ -20,14 +11,14 @@ class managed_buffer {
   char* data_;
   int size_;
 
- public:
+public:
   explicit managed_buffer(const read_func read_func,
                           const write_func write_func, char* data,
                           const int size)
-      : read_func_(read_func),
-        write_func_(write_func),
-        data_(data),
-        size_(size) {
+    : read_func_(read_func),
+      write_func_(write_func),
+      data_(data),
+      size_(size) {
     if (size < 1) {
       throw std::runtime_error("invalid size");
     }
@@ -52,8 +43,9 @@ class managed_buffer {
 class managed_streambuf final : public std::streambuf {
   managed_buffer buffer_;
 
- public:
-  explicit managed_streambuf(const managed_buffer& buffer) : buffer_(buffer) {
+public:
+  explicit managed_streambuf(const managed_buffer& buffer)
+    : buffer_(buffer) {
     // -1 trick:
     this->setp(this->buffer_.data(),
                this->buffer_.data() + this->buffer_.size() - 1);
@@ -61,7 +53,7 @@ class managed_streambuf final : public std::streambuf {
 
   ~managed_streambuf() override { sync(); }
 
- private:
+private:
   int_type overflow(const int_type i) override {
     if (!traits_type::eq_int_type(i, traits_type::eof())) {
       // see -1 trick in cstor:
@@ -100,27 +92,26 @@ class managed_streambuf final : public std::streambuf {
                  this->buffer_.data() + size);
     }
     return this->gptr() == this->egptr()
-               ? traits_type::eof()
-               : traits_type::to_int_type(*this->gptr());
+             ? traits_type::eof()
+             : traits_type::to_int_type(*this->gptr());
   }
 };
-}  // namespace
+} // namespace
 
 extern "C" {
-struct std_streambuf;
-
-CXX11_SHARP_EXPORT std_streambuf* create_managed_streambuf(
-    const read_func read_func, const write_func write_func, char* data,
-    const int size) {
+std_streambuf* cxx11_managed_streambuf_create(const read_func read_func,
+                                              const write_func write_func,
+                                              char* data,
+                                              const int size) {
   try {
     return reinterpret_cast<std_streambuf*>(new managed_streambuf(
-        managed_buffer(read_func, write_func, data, size)));
+      managed_buffer(read_func, write_func, data, size)));
   } catch (...) {
     return nullptr;
   }
 }
 
-CXX11_SHARP_EXPORT void delete_managed_streambuf(std_streambuf* streambuf) {
+void cxx11_managed_streambuf_delete(std_streambuf* streambuf) {
   delete reinterpret_cast<managed_streambuf*>(streambuf);
 }
 
@@ -128,16 +119,33 @@ CXX11_SHARP_EXPORT void delete_managed_streambuf(std_streambuf* streambuf) {
  * https://learn.microsoft.com/en-us/dotnet/framework/interop/blittable-and-non-blittable-types
  * https://stackoverflow.com/questions/4608876/c-sharp-dllimport-with-c-boolean-function-not-returning-correctly
  */
-CXX11_SHARP_EXPORT int copy_to_managed_streambuf(std_streambuf* src_streambuf,
-                                                 std_streambuf* dst_streambuf) {
+int cxx11_managed_streambuf_copy_to(std_streambuf* src_streambuf,
+                                    std_streambuf* dst_streambuf) {
   std::streambuf* src = reinterpret_cast<std::streambuf*>(src_streambuf);
   std::streambuf* dst = reinterpret_cast<std::streambuf*>(dst_streambuf);
   std::ostream os(dst);
   // os.exceptions ( std::ios::failbit | std::ios::badbit );
   os << src;
   os.flush();
-  int n = os.tellp();
+  std::streamoff n = os.tellp();
 
   return os.good() ? 0 : -1;
+}
+
+int cxx11_managed_streambuf_read_into(std_streambuf* src_streambuf,
+                                      char* buffer,
+                                      const int count) {
+  std::streambuf* src = reinterpret_cast<std::streambuf*>(src_streambuf);
+  const int ret = static_cast<int>(src->sgetn(buffer, count));
+  const int sync = src->pubsync();
+  return sync == 0 ? ret : -1;
+}
+
+int cxx11_managed_streambuf_write_into(std_streambuf* dst_streambuf,
+                                       const char* buffer, const int count) {
+  std::streambuf* dst = reinterpret_cast<std::streambuf*>(dst_streambuf);
+  const int ret = static_cast<int>(dst->sputn(buffer, count));
+  const int sync = dst->pubsync();
+  return sync == 0 ? ret : -1;
 }
 }
