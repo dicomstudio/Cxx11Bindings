@@ -119,19 +119,6 @@ void cxx11_managed_streambuf_delete(std_streambuf* streambuf) {
  * https://learn.microsoft.com/en-us/dotnet/framework/interop/blittable-and-non-blittable-types
  * https://stackoverflow.com/questions/4608876/c-sharp-dllimport-with-c-boolean-function-not-returning-correctly
  */
-int cxx11_managed_streambuf_copy_to(std_streambuf* src_streambuf,
-                                    std_streambuf* dst_streambuf) {
-  std::streambuf* src = reinterpret_cast<std::streambuf*>(src_streambuf);
-  std::streambuf* dst = reinterpret_cast<std::streambuf*>(dst_streambuf);
-  std::ostream os(dst);
-  // os.exceptions ( std::ios::failbit | std::ios::badbit );
-  os << src;
-  os.flush();
-  std::streamoff n = os.tellp();
-
-  return os.good() ? 0 : -1;
-}
-
 int cxx11_managed_streambuf_read_into(std_streambuf* src_streambuf,
                                       char* buffer,
                                       const int count) {
