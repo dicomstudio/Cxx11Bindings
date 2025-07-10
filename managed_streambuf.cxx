@@ -122,13 +122,13 @@ class managed_streambuf final : public std::streambuf {
 }  // namespace
 
 extern "C" {
-std_streambuf* cxx11_managed_streambuf_create(const read_func read_func,
-                                              const write_func write_func,
-                                              const flush_func flush_func,
-                                              const seek_func seek_func,
-                                              char* data, const int size) {
+cxx11_streambuf* cxx11_managed_streambuf_create(const read_func read_func,
+                                                const write_func write_func,
+                                                const flush_func flush_func,
+                                                const seek_func seek_func,
+                                                char* data, const int size) {
   try {
-    return reinterpret_cast<std_streambuf*>(
+    return reinterpret_cast<cxx11_streambuf*>(
         new managed_streambuf(managed_buffer(read_func, write_func, data, size),
                               flush_func, seek_func));
   } catch (...) {
@@ -136,7 +136,7 @@ std_streambuf* cxx11_managed_streambuf_create(const read_func read_func,
   }
 }
 
-void cxx11_managed_streambuf_delete(std_streambuf* streambuf) {
+void cxx11_managed_streambuf_delete(cxx11_streambuf* streambuf) {
   delete reinterpret_cast<managed_streambuf*>(streambuf);
 }
 
@@ -144,7 +144,7 @@ void cxx11_managed_streambuf_delete(std_streambuf* streambuf) {
  * https://learn.microsoft.com/en-us/dotnet/framework/interop/blittable-and-non-blittable-types
  * https://stackoverflow.com/questions/4608876/c-sharp-dllimport-with-c-boolean-function-not-returning-correctly
  */
-int cxx11_managed_streambuf_read_into(std_streambuf* src_streambuf,
+int cxx11_managed_streambuf_read_into(cxx11_streambuf* src_streambuf,
                                       char* buffer, const int count) {
   std::streambuf* src = reinterpret_cast<std::streambuf*>(src_streambuf);
 
@@ -156,7 +156,7 @@ int cxx11_managed_streambuf_read_into(std_streambuf* src_streambuf,
   }
 }
 
-int cxx11_managed_streambuf_write_into(std_streambuf* dst_streambuf,
+int cxx11_managed_streambuf_write_into(cxx11_streambuf* dst_streambuf,
                                        const char* buffer, const int count) {
   std::streambuf* dst = reinterpret_cast<std::streambuf*>(dst_streambuf);
   try {
@@ -171,13 +171,13 @@ int cxx11_managed_streambuf_write_into(std_streambuf* dst_streambuf,
  * https://learn.microsoft.com/en-us/dotnet/framework/interop/blittable-and-non-blittable-types
  * https://stackoverflow.com/questions/4608876/c-sharp-dllimport-with-c-boolean-function-not-returning-correctly
  */
-int cxx11_managed_streambuf_flush(std_streambuf* dst_streambuf) {
+int cxx11_managed_streambuf_flush(cxx11_streambuf* dst_streambuf) {
   std::streambuf* dst = reinterpret_cast<std::streambuf*>(dst_streambuf);
   const int sync = dst->pubsync();
   return sync;
 }
 
-long cxx11_managed_streambuf_test_size(std_streambuf* src_streambuf) {
+long cxx11_managed_streambuf_test_size(cxx11_streambuf* src_streambuf) {
   const auto src = reinterpret_cast<std::streambuf*>(src_streambuf);
   const std::streampos end_pos =
       src->pubseekoff(0, std::ios_base::end, std::ios_base::in);
