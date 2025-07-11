@@ -1,8 +1,14 @@
 #include "public.h"
+#include "std_streambuf.hxx"
 
 #include <cassert>
 #include <cstdio>
 #include <fstream>
+
+#ifndef _MSC_VER
+#include <sys/types.h>
+#include <unistd.h>
+#endif
 
 namespace cxx11 {
 struct filebuf {
@@ -98,8 +104,7 @@ int cxx11_filebuf_read(cxx11_filebuf* cxx11_fb, char* buffer,
   (void)offset;
   const auto cxx11_filebuf = reinterpret_cast<cxx11::filebuf*>(cxx11_fb);
   std::filebuf* filebuf = &cxx11_filebuf->fb;
-  const std::streamsize bytes_read = filebuf->sgetn(buffer, count);
-  return static_cast<int>(bytes_read);
+  return std_streambuf_read(filebuf, buffer, count);
 }
 
 int cxx11_filebuf_write(cxx11_filebuf* cxx11_fb, const char* buffer,
@@ -110,90 +115,68 @@ int cxx11_filebuf_write(cxx11_filebuf* cxx11_fb, const char* buffer,
   (void)offset;
   const auto cxx11_filebuf = reinterpret_cast<cxx11::filebuf*>(cxx11_fb);
   std::filebuf* filebuf = &cxx11_filebuf->fb;
-  const std::streamsize bytes_read = filebuf->sputn(buffer, count);
-  return static_cast<int>(bytes_read);
+  return std_streambuf_write(filebuf, buffer, count);
 }
 
 long cxx11_filebuf_seek(cxx11_filebuf* cxx11_fb, const long offset,
                         const int origin) {
   const auto cxx11_filebuf = reinterpret_cast<cxx11::filebuf*>(cxx11_fb);
   std::filebuf* filebuf = &cxx11_filebuf->fb;
-  std::ios_base::seekdir dir;
-  // Begin 0
-  // Current 1
-  // End 2
-  switch (origin) {
-    case 0:
-      dir = std::ios_base::beg;
-      break;
-    case 1:
-      dir = std::ios_base::cur;
-      break;
-    case 2:
-      dir = std::ios_base::end;
-      break;
-    default:
-      return -1;  // Invalid origin
-  }
-
-  const std::streamoff ret =
-      filebuf->pubseekoff(offset, dir, std::ios_base::in);
-  return static_cast<long>(ret);
+  return std_streambuf_seek(filebuf, offset, origin);
 }
 
 int cxx11_filebuf_flush(cxx11_filebuf* cxx11_fb) {
   const auto cxx11_filebuf = reinterpret_cast<cxx11::filebuf*>(cxx11_fb);
   std::filebuf* filebuf = &cxx11_filebuf->fb;
-  const int result = filebuf->pubsync();  // returns 0 on success, -1 on failure
-  return result;
+  return std_streambuf_flush(filebuf);
 }
 
 long cxx11_filebuf_get_position(cxx11_filebuf* cxx11_fb) {
   const auto cxx11_filebuf = reinterpret_cast<cxx11::filebuf*>(cxx11_fb);
   std::filebuf* filebuf = &cxx11_filebuf->fb;
-  const std::streampos pos =
-      filebuf->pubseekoff(0, std::ios_base::cur, std::ios_base::in);
-  if (pos == std::streampos(-1)) {
-    return -1;
-  }
-  return static_cast<long>(pos);
+  return std_streambuf_get_position(filebuf);
 }
 
 int cxx11_filebuf_set_position(cxx11_filebuf* cxx11_fb, const long position) {
   const auto cxx11_filebuf = reinterpret_cast<cxx11::filebuf*>(cxx11_fb);
   std::filebuf* filebuf = &cxx11_filebuf->fb;
-  const std::streampos pos =
-      filebuf->pubseekpos(position, std::ios_base::in | std::ios_base::out);
-  if (pos == std::streampos(-1)) {
-    return -1;
-  }
-  return 0;
+  return std_streambuf_set_position(filebuf, position);
 }
 
 long cxx11_filebuf_get_length(cxx11_filebuf* cxx11_fb) {
   const auto cxx11_filebuf = reinterpret_cast<cxx11::filebuf*>(cxx11_fb);
   std::filebuf* filebuf = &cxx11_filebuf->fb;
-  // Save current position
-  const std::streampos current =
-      filebuf->pubseekoff(0, std::ios_base::cur, std::ios_base::in);
-  if (current == std::streampos(-1)) {
-    return -1;
-  }
-  // Seek to end to get length
-  const std::streampos end =
-      filebuf->pubseekoff(0, std::ios_base::end, std::ios_base::in);
-  if (end == std::streampos(-1)) {
-    return -1;
-  }
-  // Restore position
-  filebuf->pubseekpos(current, std::ios_base::in);
-  return static_cast<long>(end);
+  return std_streambuf_get_length(filebuf);
 }
 
-int cxx11_filebuf_set_length(cxx11_filebuf*, long) {
-  FILE* fp = nullptr;
+int cxx11_filebuf_set_length(cxx11_filebuf* cxx11_fb, const long length) {
+  const auto cxx11_filebuf = reinterpret_cast<cxx11::filebuf*>(cxx11_fb);
+  std::filebuf* filebuf = &cxx11_filebuf->fb;
+  // filebuf specific:
 #ifdef _MSC_VER
+  (void)filebuf;
+  (void)length;
+  // FIXME on windows we cannot access the FILE* from std::filebuf
+  // we should eventually do the opposite and construct the std::filebuf from
+  // the FILE* directly:
+  FILE* fp = nullptr;
   std::fstream stream(fp);
+#else
+  // linux uses ftruncate:
+  // Try to get FILE* from filebuf
+  FILE* fp = nullptr;  // filebuf->_M_file;  // This is non-standard, works on
+                       // libstdc++
+  if (!fp) {
+    return -1;
+  }
+  int fd = fileno(fp);
+  if (fd == -1) {
+    return -1;
+  }
+  // Set the file size using ftruncate
+  if (ftruncate(fd, length) == 0) {
+    return 0;
+  }
 #endif
   return -1;
 }
@@ -201,6 +184,7 @@ int cxx11_filebuf_set_length(cxx11_filebuf*, long) {
 int cxx11_filebuf_can_read(cxx11_filebuf* cxx11_fb) {
   const auto cxx11_filebuf = reinterpret_cast<cxx11::filebuf*>(cxx11_fb);
   std::filebuf* filebuf = &cxx11_filebuf->fb;
+  // filebuf specific:
   auto mode = cxx11_filebuf->open_mode;
   if (filebuf->is_open() && mode & std::ios::in) {
     return 0;
@@ -212,6 +196,7 @@ int cxx11_filebuf_can_write(cxx11_filebuf* cxx11_fb) {
   const auto cxx11_filebuf = reinterpret_cast<cxx11::filebuf*>(cxx11_fb);
   std::filebuf* filebuf = &cxx11_filebuf->fb;
   const auto mode = cxx11_filebuf->open_mode;
+  // filebuf specific:
   if (filebuf->is_open() && mode & std::ios::out) {
     return 0;
   }
@@ -221,14 +206,6 @@ int cxx11_filebuf_can_write(cxx11_filebuf* cxx11_fb) {
 int cxx11_filebuf_can_seek(cxx11_filebuf* cxx11_fb) {
   const auto cxx11_filebuf = reinterpret_cast<cxx11::filebuf*>(cxx11_fb);
   std::filebuf* filebuf = &cxx11_filebuf->fb;
-  if (!filebuf->is_open()) {
-    return -1;
-  }
-  const auto pos =
-      filebuf->pubseekoff(0, std::ios_base::cur, std::ios_base::in);
-  if (pos != std::streampos(-1)) {
-    return 0;
-  }
-  return -1;
+  return std_streambuf_can_seek(filebuf);
 }
 }

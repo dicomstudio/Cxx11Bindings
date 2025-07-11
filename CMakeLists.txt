@@ -17,7 +17,8 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 include(GNUInstallDirs)
 set(Cxx11Sharp_LIBRARY_INSTALL_DIR "${CMAKE_INSTALL_LIBDIR}")
 
-add_library(Cxx11Sharp MODULE managed_streambuf.cxx cxx11_filebuf.cxx)
+add_library(Cxx11Sharp MODULE managed_streambuf.cxx cxx11_filebuf.cxx public.h
+                              std_streambuf.hxx)
 
 install(
   TARGETS Cxx11Sharp

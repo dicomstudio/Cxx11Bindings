@@ -1,5 +1,7 @@
 #include "public.h"
+#include "std_streambuf.hxx"
 
+#include <cassert>
 #include <iostream>  // FIXME: streambuf
 
 namespace {
@@ -34,6 +36,7 @@ class managed_buffer {
 
   // write is not const because it modifies the buffer (C# side)
   int write(const int count) /* const */ {
+    // FIXME what is the behavior of write(0) ?
     const int ret = (*write_func_)(count);
     return ret;
   }
@@ -49,7 +52,6 @@ class managed_streambuf final : public std::streambuf {
  public:
   explicit managed_streambuf(const managed_buffer& buffer,
                              flush_func flush_func, seek_func seek_func)
-
       : buffer_(buffer), flush_func_(flush_func), seek_func_(seek_func) {
     // -1 trick:
     this->setp(this->buffer_.data(),
@@ -96,12 +98,20 @@ class managed_streambuf final : public std::streambuf {
     return size == num;
   }
 
-  pos_type seekoff(const off_type off, const std::ios_base::seekdir way,
+  // Override seekoff for seeking by offset
+  pos_type seekoff(const off_type off, const std::ios_base::seekdir dir,
                    std::ios_base::openmode which) override {
-    const long ret = (*seek_func_)(static_cast<long>(off), way);
+    const long ret = (*seek_func_)(static_cast<long>(off), dir);
     return ret;
   }
 
+  // Override seekpos for seeking to an absolute position
+  pos_type seekpos(pos_type pos, std::ios_base::openmode which) override {
+    const long ret = (*seek_func_)(static_cast<long>(pos), std::ios_base::beg);
+    return ret;
+  }
+
+  // fetch more data:
   int_type underflow() override {
     if (this->gptr() == this->egptr()) {
       const int size = this->buffer_.read();
@@ -136,62 +146,62 @@ cxx11_streambuf* cxx11_managed_streambuf_create(const read_func read_func,
   }
 }
 
-void cxx11_managed_streambuf_delete(cxx11_streambuf* streambuf) {
-  delete reinterpret_cast<managed_streambuf*>(streambuf);
+void cxx11_managed_streambuf_delete(cxx11_streambuf* cxx11_streambuf) {
+  delete reinterpret_cast<managed_streambuf*>(cxx11_streambuf);
 }
 
 /* bool is non-blittable type, do not use in API
  * https://learn.microsoft.com/en-us/dotnet/framework/interop/blittable-and-non-blittable-types
  * https://stackoverflow.com/questions/4608876/c-sharp-dllimport-with-c-boolean-function-not-returning-correctly
  */
-int cxx11_managed_streambuf_read_into(cxx11_streambuf* src_streambuf,
+int cxx11_managed_streambuf_read_into(cxx11_streambuf* cxx11_streambuf,
                                       char* buffer, const int count) {
-  std::streambuf* src = reinterpret_cast<std::streambuf*>(src_streambuf);
-
-  try {
-    const int ret = static_cast<int>(src->sgetn(buffer, count));
-    return ret;
-  } catch (...) {
-    return -1;
-  }
+  const auto streambuf = reinterpret_cast<managed_streambuf*>(cxx11_streambuf);
+  return std_streambuf_read(streambuf, buffer, count);
 }
 
-int cxx11_managed_streambuf_write_into(cxx11_streambuf* dst_streambuf,
+int cxx11_managed_streambuf_write_into(cxx11_streambuf* cxx11_streambuf,
                                        const char* buffer, const int count) {
-  std::streambuf* dst = reinterpret_cast<std::streambuf*>(dst_streambuf);
-  try {
-    const int ret = static_cast<int>(dst->sputn(buffer, count));
-    return ret;
-  } catch (...) {
-    return -1;
-  }
+  const auto streambuf = reinterpret_cast<managed_streambuf*>(cxx11_streambuf);
+  return std_streambuf_write(streambuf, buffer, count);
+}
+
+long cxx11_managed_streambuf_seek(cxx11_streambuf* cxx11_streambuf,
+                                  const long offset, const int origin) {
+  const auto streambuf = reinterpret_cast<managed_streambuf*>(cxx11_streambuf);
+  return std_streambuf_seek(streambuf, offset, origin);
 }
 
 /* bool is non-blittable type, do not use in API
  * https://learn.microsoft.com/en-us/dotnet/framework/interop/blittable-and-non-blittable-types
  * https://stackoverflow.com/questions/4608876/c-sharp-dllimport-with-c-boolean-function-not-returning-correctly
  */
-int cxx11_managed_streambuf_flush(cxx11_streambuf* dst_streambuf) {
-  std::streambuf* dst = reinterpret_cast<std::streambuf*>(dst_streambuf);
-  const int sync = dst->pubsync();
-  return sync;
+int cxx11_managed_streambuf_flush(cxx11_streambuf* cxx11_streambuf) {
+  const auto streambuf = reinterpret_cast<managed_streambuf*>(cxx11_streambuf);
+  return std_streambuf_flush(streambuf);
 }
 
-long cxx11_managed_streambuf_test_size(cxx11_streambuf* src_streambuf) {
-  const auto src = reinterpret_cast<std::streambuf*>(src_streambuf);
-  const std::streampos end_pos =
-      src->pubseekoff(0, std::ios_base::end, std::ios_base::in);
-  // non-seekable stream:
-  if (end_pos == std::streampos(-1)) {
-    return -1;
-  }
+long cxx11_managed_streambuf_get_position(cxx11_streambuf* cxx11_streambuf) {
+  const auto streambuf = reinterpret_cast<managed_streambuf*>(cxx11_streambuf);
+  return std_streambuf_get_position(streambuf);
+}
 
-  const std::streampos pos =
-      src->pubseekoff(0, std::ios_base::beg, std::ios_base::in);
-  // wotsit ?
-  if (pos == std::streampos(-1)) {
-    return -2;
-  }
-  return static_cast<long>(end_pos);
+int cxx11_managed_streambuf_set_position(cxx11_streambuf* cxx11_streambuf,
+                                         const long position) {
+  const auto streambuf = reinterpret_cast<managed_streambuf*>(cxx11_streambuf);
+  auto db = std_streambuf_get_position(streambuf);
+  return std_streambuf_set_position(streambuf, position);
+}
+
+long cxx11_managed_streambuf_get_length(cxx11_streambuf* cxx11_streambuf) {
+  const auto streambuf = reinterpret_cast<managed_streambuf*>(cxx11_streambuf);
+  return std_streambuf_get_length(streambuf);
+}
+
+int cxx11_managed_streambuf_set_length(cxx11_streambuf* cxx11_streambuf,
+                                       const long length) {
+  (void)cxx11_streambuf;
+  (void)length;
+  return -1;
 }
 }
