@@ -41,6 +41,7 @@
   <ItemGroup>
     <ClCompile Include="managed_streambuf.cxx" />
     <ClCompile Include="cxx11_filebuf.cxx" />
+    <ClCompile Include="c11_filebuf.cxx" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="public.h" />

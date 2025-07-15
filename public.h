@@ -70,6 +70,34 @@ CXX11_SHARP_EXPORT int cxx11_filebuf_can_read(cxx11_filebuf* cxx11_fb);
 CXX11_SHARP_EXPORT int cxx11_filebuf_can_write(cxx11_filebuf* cxx11_fb);
 CXX11_SHARP_EXPORT int cxx11_filebuf_can_seek(cxx11_filebuf* cxx11_fb);
 
+struct c11_filebuf;
+CXX11_SHARP_EXPORT c11_filebuf* c11_filebuf_create1(const char* path,
+                                                    int file_mode,
+                                                    int file_access,
+                                                    int file_share);
+CXX11_SHARP_EXPORT c11_filebuf* c11_filebuf_create2(const wchar_t* path,
+                                                    int file_mode,
+                                                    int file_access,
+                                                    int file_share);
+CXX11_SHARP_EXPORT void c11_filebuf_delete(c11_filebuf* c11_fb);
+CXX11_SHARP_EXPORT int c11_filebuf_read(c11_filebuf* c11_fb, char* buffer,
+                                        int buffer_length, int offset,
+                                        int count);
+CXX11_SHARP_EXPORT int c11_filebuf_write(c11_filebuf* c11_fb,
+                                         const char* buffer, int buffer_length,
+                                         int offset, int count);
+CXX11_SHARP_EXPORT long c11_filebuf_seek(c11_filebuf* c11_fb, long offset,
+                                         int origin);
+CXX11_SHARP_EXPORT int c11_filebuf_flush(c11_filebuf* c11_fb);
+CXX11_SHARP_EXPORT long c11_filebuf_get_position(c11_filebuf* c11_fb);
+CXX11_SHARP_EXPORT int c11_filebuf_set_position(c11_filebuf* c11_fb,
+                                                long position);
+CXX11_SHARP_EXPORT long c11_filebuf_get_length(c11_filebuf* c11_fb);
+CXX11_SHARP_EXPORT int c11_filebuf_set_length(c11_filebuf* c11_fb, long length);
+CXX11_SHARP_EXPORT int c11_filebuf_can_read(c11_filebuf* c11_fb);
+CXX11_SHARP_EXPORT int c11_filebuf_can_write(c11_filebuf* c11_fb);
+CXX11_SHARP_EXPORT int c11_filebuf_can_seek(c11_filebuf* c11_fb);
+
 #ifdef __cplusplus
 }  // end extern "C"
 #endif
