@@ -146,8 +146,14 @@ cxx11_streambuf* cxx11_managed_streambuf_create(const read_func read_func,
   }
 }
 
-void cxx11_managed_streambuf_delete(cxx11_streambuf* cxx11_streambuf) {
-  delete reinterpret_cast<managed_streambuf*>(cxx11_streambuf);
+int cxx11_managed_streambuf_delete(cxx11_streambuf* cxx11_streambuf) {
+  try {
+    delete reinterpret_cast<managed_streambuf*>(cxx11_streambuf);
+    return 0;
+  } catch (...) {
+    // FIXME
+    return -1;
+  }
 }
 
 /* bool is non-blittable type, do not use in API

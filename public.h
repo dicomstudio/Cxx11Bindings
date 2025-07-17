@@ -21,7 +21,7 @@ struct cxx11_streambuf;
 CXX11_SHARP_EXPORT cxx11_streambuf* cxx11_managed_streambuf_create(
     read_func read_func, write_func write_func, flush_func flush_func,
     seek_func seek_func, char* data, int size);
-CXX11_SHARP_EXPORT void cxx11_managed_streambuf_delete(
+CXX11_SHARP_EXPORT int cxx11_managed_streambuf_delete(
     cxx11_streambuf* cxx11_streambuf);
 CXX11_SHARP_EXPORT int cxx11_managed_streambuf_read_into(
     cxx11_streambuf* cxx11_streambuf, char* buffer, int count);
