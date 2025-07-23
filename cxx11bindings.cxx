@@ -2,14 +2,14 @@
 #include "cxx11bindings.hxx"
 
 namespace cxx11 {
-/* managed buffer API for system.io.stream. No allocation done, simply provide
+/* managed buffer API for system.io.stream. No allocation done, simply provides
  * access to the managed buffer memory */
-class managed_buffer {
+class virtual_buffer {
   byte* data_;
   size count_;
 
  public:
-  explicit managed_buffer(byte* data, const size count)
+  explicit virtual_buffer(byte* data, const size count)
       : data_(data), count_(count) {
     if (count < 1 || count > 0x7ffff000) {
       throw std::runtime_error("invalid size");
@@ -23,7 +23,7 @@ class managed_buffer {
 // https://stackoverflow.com/questions/14086417/how-to-write-custom-input-stream-in-c
 // https://stackoverflow.com/questions/22116158/whats-wrong-with-this-stream-buffer
 class streambuf final : public std::streambuf {
-  managed_buffer buffer_;
+  virtual_buffer buffer_;
   read_fn read_;
   write_fn write_;
   seek_fn seek_;
@@ -35,7 +35,7 @@ class streambuf final : public std::streambuf {
   streambuf& operator=(const streambuf& other) = delete;
   streambuf& operator=(streambuf&& other) noexcept = delete;
 
-  explicit streambuf(const managed_buffer& buffer, const read_fn read,
+  explicit streambuf(const virtual_buffer& buffer, const read_fn read,
                      const write_fn write, const seek_fn seek,
                      const flush_fn flush)
       : buffer_(buffer),
@@ -167,7 +167,7 @@ cxx11_streambuf* cxx11_streambuf_create_buffer(const read_fn read,
                                                const size count) {
   try {
     return reinterpret_cast<cxx11_streambuf*>(
-        new (std::nothrow) cxx11::streambuf(cxx11::managed_buffer(buf, count),
+        new (std::nothrow) cxx11::streambuf(cxx11::virtual_buffer(buf, count),
                                             read, write, seek, flush));
   } catch (...) {
     // return reinterpret_cast<c11_stream*>(-1);
