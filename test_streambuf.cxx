@@ -39,7 +39,7 @@ TEST(FileBufComparison, WriteAndRead) {
   {
     std::filebuf impl;
     impl.open(filename, std::ios::in);
-    cxx11::stream_buf_adapter adapter(&impl);
+    cxx11::streambuf_adapter adapter(&impl);
     cxx11::default_streambuf fb(&adapter);
     std::istream is(&fb);
     is.read(&custom_read[0], data.size());
@@ -80,7 +80,7 @@ TEST(DefaultStreamBuf, WriteReadSeekFlush) {
   {
     std::filebuf fb;
     fb.open(filename, std::ios::in);
-    cxx11::stream_buf_adapter adapter(&fb);
+    cxx11::streambuf_adapter adapter(&fb);
     cxx11::default_streambuf buf(&adapter);
     std::istream is(&buf);
 
@@ -124,7 +124,7 @@ TEST(DefaultStreamBuf, WriteReadSeekFlush2) {
   {
     std::filebuf impl;
     impl.open(filename, std::ios::out);
-    cxx11::stream_buf_adapter adapter(&impl);
+    cxx11::streambuf_adapter adapter(&impl);
     cxx11::default_streambuf fb(&adapter);
     auto size = fb.sputn(data.data(), data.size());
     EXPECT_EQ(0, size);
@@ -151,7 +151,7 @@ TEST(DefaultStreamBuf, WriteReadSeekFlush3) {
   {
     std::filebuf impl;
     impl.open(filename, std::ios::in);
-    cxx11::stream_buf_adapter adapter(&impl);
+    cxx11::streambuf_adapter adapter(&impl);
     cxx11::default_streambuf fb(&adapter);
     auto size = fb.sgetn(&data[0], data.size());
     EXPECT_EQ(0, size);
@@ -199,7 +199,7 @@ TEST(DefaultStreamBuf, WriteReadSeekFlush5) {
   }
   {
     MyStreamBuf1 impl;
-    cxx11::stream_buf_adapter adapter(&impl);
+    cxx11::streambuf_adapter adapter(&impl);
     cxx11::default_streambuf rdbuf(&adapter);
     std::ostringstream oss;
     EXPECT_TRUE(oss.exceptions() == std::ios_base::goodbit);
@@ -227,7 +227,7 @@ TEST(DefaultStreamBuf, WriteReadSeekFlush5) {
   }
   {
     MyStreamBuf2 impl;
-    cxx11::stream_buf_adapter adapter(&impl);
+    cxx11::streambuf_adapter adapter(&impl);
     cxx11::default_streambuf rdbuf(&adapter);
     std::ostringstream oss;
     EXPECT_TRUE(oss.exceptions() == std::ios_base::goodbit);
@@ -279,7 +279,7 @@ TEST(DefaultStreamBuf, WriteReadSeekFlush6) {
   }
   {
     error_streambuf impl;
-    cxx11::stream_buf_adapter adapter(&impl);
+    cxx11::streambuf_adapter adapter(&impl);
     // default_streambuf rdbuf(&adapter);
     cxx11::nobuffer_streambuf rdbuf(&adapter);
 

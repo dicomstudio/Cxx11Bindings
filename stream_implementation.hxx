@@ -132,11 +132,11 @@ class simple_streambuf final : public std::streambuf {
 #else
     int whence;
     if (way == std::ios_base::beg) {
-      whence = seek_dir::seek_beg;
+      whence = seek_dirs::seek_beg;
     } else if (way == std::ios_base::cur) {
-      whence = seek_dir::seek_cur;
+      whence = seek_dirs::seek_cur;
     } else if (way == std::ios_base::end) {
-      whence = seek_dir::seek_end;
+      whence = seek_dirs::seek_end;
     } else {
       // throw std::invalid_argument("invalid way");
       return -1;
@@ -154,7 +154,7 @@ class simple_streambuf final : public std::streambuf {
         if (std::fseek(file_, pos, SEEK_SET) != 0) return pos_type(-1);
         return std::ftell(file_);
 #else
-    const auto new_pos = stream_->seek(pos, seek_dir::seek_beg);
+    const auto new_pos = stream_->seek(pos, seek_dirs::seek_beg);
     // throw_exception_from_long_long(new_pos, "seekpos error");
     // must return {-1} if seek operation fails
     return new_pos;

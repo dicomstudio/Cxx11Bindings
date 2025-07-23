@@ -21,7 +21,7 @@ TEST(FileComparison, WriteAndRead) {
   {
     FILE *impl;
     impl = fopen(filename, "rb");
-    cxx11::c_file_adapter adapter(impl);
+    cxx11::cfile_adapter adapter(impl);
     cxx11::default_streambuf fb(&adapter);
     std::istream is(&fb);
     is.read(&custom_read[0], data.size());

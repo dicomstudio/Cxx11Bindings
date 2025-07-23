@@ -17,6 +17,7 @@ enum class CxxExceptionCode : int {
   DomainError = -5,
   IoFailure = -6,
   NullPointer = -7,
+  NotImplemented = -8,
   Unknown = -1000
 };
 
@@ -29,41 +30,76 @@ class stream_interface {
 
   stream_interface() = default;
   virtual ~stream_interface() = default;
-  virtual int read(byte* buf, int size) = 0;
-  virtual int write(const byte* buf, int size) = 0;
-  virtual int64_t seek(int64_t off, int dir) = 0;
+
+  virtual int read(byte* buf, size count) = 0;
+  virtual int write(const byte* buf, size count) = 0;
+  virtual offset seek(offset off, seek_dir dir) = 0;
   virtual int flush() = 0;
+
+  virtual int trunc(length size) {
+    return static_cast<int>(CxxExceptionCode::NotImplemented);
+  }
 };
 
-class plugin_stream final : public stream_interface {
+class c_stream final : public stream_interface {
+  read_fn read_;
+  write_fn write_;
+  seek_fn seek_;
+  flush_fn flush_;
+  trunc_fn trunc_;
+
  public:
-  plugin_stream(const plugin_stream& other) = delete;
-  plugin_stream(plugin_stream&& other) noexcept = delete;
-  plugin_stream& operator=(const plugin_stream& other) = delete;
-  plugin_stream& operator=(plugin_stream&& other) noexcept = delete;
+  c_stream(const c_stream& other) = delete;
+  c_stream(c_stream&& other) noexcept = delete;
+  c_stream& operator=(const c_stream& other) = delete;
+  c_stream& operator=(c_stream&& other) noexcept = delete;
 
-  plugin_stream() : stream_interface() {
-    cxx11_stream_ = cxx11_stream_create(nullptr, nullptr, nullptr, nullptr);
+  c_stream(const read_fn read, const write_fn write, const seek_fn seek,
+           const flush_fn flush, const trunc_fn trunc)
+      : stream_interface() {
+    read_ = read;
+    write_ = write;
+    seek_ = seek;
+    flush_ = flush;
+    trunc_ = trunc;
   }
 
-  ~plugin_stream() override { cxx11_stream_delete(cxx11_stream_); }
+  ~c_stream() override = default;
 
-  int read(byte* buf, const int size) override {
-    return cxx11_stream_->read(cxx11_stream_, buf, size);
+  int read(byte* buf, const size count) override {
+    if (read_) {
+      return read_(buf, count);
+    }
+    return static_cast<int>(CxxExceptionCode::NotImplemented);
   }
 
-  int write(const byte* buf, const int size) override {
-    return cxx11_stream_->write(cxx11_stream_, buf, size);
+  int write(const byte* buf, const size count) override {
+    if (write_) {
+      return write_(buf, count);
+    }
+    return static_cast<int>(CxxExceptionCode::NotImplemented);
   }
 
-  int64_t seek(const int64_t off, const int dir) override {
-    return cxx11_stream_->seek(cxx11_stream_, off, dir);
+  offset seek(const offset off, const seek_dir dir) override {
+    if (seek_) {
+      return seek_(off, dir);
+    }
+    return static_cast<offset>(CxxExceptionCode::NotImplemented);
   }
 
-  int flush() override { return cxx11_stream_->flush(cxx11_stream_); }
+  int flush() override {
+    if (flush_) {
+      return flush_();
+    }
+    return static_cast<int>(CxxExceptionCode::NotImplemented);
+  }
 
- private:
-  cxx11_stream* cxx11_stream_;
+  int trunc(const length size) override {
+    if (trunc_) {
+      return trunc_(size);
+    }
+    return static_cast<int>(CxxExceptionCode::NotImplemented);
+  }
 };
 
 // Custom exception class
@@ -74,6 +110,13 @@ class null_pointer final : public std::exception {
   }
 
   null_pointer() = default;
+};
+
+class not_implemented_exception final : public std::logic_error {
+ public:
+  explicit not_implemented_exception(
+      const std::string& message = "Function not yet implemented")
+      : std::logic_error(message) {}
 };
 
 [[noreturn]] static inline void throw_exception_from_enum(

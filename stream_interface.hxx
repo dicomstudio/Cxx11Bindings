@@ -6,16 +6,16 @@
 #include <string>
 
 namespace cxx11 {
-class stream_buf_adapter final : public stream_interface {
+class streambuf_adapter final : public stream_interface {
  public:
-  explicit stream_buf_adapter(std::streambuf* stream) : stream_(stream) {}
+  explicit streambuf_adapter(std::streambuf* stream) : stream_(stream) {}
 
-  int read(byte* buf, const int size) override {
+  int read(byte* buf, const size count) override {
     if (!stream_) {
       return static_cast<int>(CxxExceptionCode::NullPointer);
     }
     int n = 0;
-    for (; n < size; ++n) {
+    for (; n < count; ++n) {
       const int c = stream_->sbumpc();
       if (c == std::char_traits<char>::eof()) {
         break;
@@ -25,12 +25,12 @@ class stream_buf_adapter final : public stream_interface {
     return n;
   }
 
-  int write(const byte* buf, const int size) override {
+  int write(const byte* buf, const size count) override {
     if (!stream_) {
       return static_cast<int>(CxxExceptionCode::NullPointer);
     }
     int n = 0;
-    for (; n < size; ++n) {
+    for (; n < count; ++n) {
       if (stream_->sputc(static_cast<char>(buf[n])) ==
           std::char_traits<char>::eof()) {
         break;
@@ -45,13 +45,13 @@ class stream_buf_adapter final : public stream_interface {
     }
     std::ios_base::seekdir sd;
     switch (dir) {
-      case seek_dir::seek_beg:
+      case seek_dirs::seek_beg:
         sd = std::ios_base::beg;
         break;
-      case seek_dir::seek_cur:
+      case seek_dirs::seek_cur:
         sd = std::ios_base::cur;
         break;
-      case seek_dir::seek_end:
+      case seek_dirs::seek_end:
         sd = std::ios_base::end;
         break;
       default:
@@ -74,39 +74,39 @@ class stream_buf_adapter final : public stream_interface {
 };
 
 // C-FILE
-class c_file_adapter final : public stream_interface {
+class cfile_adapter final : public stream_interface {
  public:
-  explicit c_file_adapter(FILE* stream) : stream_(stream) {}
+  explicit cfile_adapter(FILE* stream) : stream_(stream) {}
 
-  int read(byte* buf, const int size) override {
+  int read(byte* buf, const size count) override {
     if (!stream_) {
       return static_cast<int>(CxxExceptionCode::NullPointer);
     }
-    const size_t ret = fread(buf, 1, size, stream_);
+    const size_t ret = fread(buf, 1, count, stream_);
     return static_cast<int>(ret);
   }
 
-  int write(const byte* buf, int size) override {
+  int write(const byte* buf, size count) override {
     if (!stream_) {
       return static_cast<int>(CxxExceptionCode::NullPointer);
     }
-    const size_t ret = fwrite(buf, 1, size, stream_);
+    const size_t ret = fwrite(buf, 1, count, stream_);
     return static_cast<int>(ret);
   }
 
-  int64_t seek(const int64_t off, const int dir) override {
+  offset seek(const offset off, const seek_dir dir) override {
     if (!stream_) {
       return static_cast<int>(CxxExceptionCode::NullPointer);
     }
     int whence;
     switch (dir) {
-      case seek_dir::seek_beg:
+      case seek_dirs::seek_beg:
         whence = SEEK_SET;
         break;
-      case seek_dir::seek_cur:
+      case seek_dirs::seek_cur:
         whence = SEEK_CUR;
         break;
-      case seek_dir::seek_end:
+      case seek_dirs::seek_end:
         whence = SEEK_END;
         break;
       default:

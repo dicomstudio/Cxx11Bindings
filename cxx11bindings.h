@@ -1,6 +1,5 @@
 #pragma once
 #include <stdint.h>
-#include <wchar.h>
 #ifdef __GNUC__
 #define CXX11_BINDINGS_EXPORT __attribute__((visibility("default")))
 #else
@@ -13,35 +12,46 @@ extern "C" {
 
 // https://stackoverflow.com/questions/29631692/self-referencing-class-concrete-python-class-from-c-interface
 
+// On  Linux,  write()  (and similar system calls) will transfer at most
+// 0x7ffff000 (2,147,479,552) bytes, returning the number of bytes actually
+// transferred.
 typedef uint8_t byte;
-struct cxx11_stream;
+// stream offset (aka off_t)
+typedef int64_t offset;
+// buffer size (aka size_t)
+typedef uint32_t size;
+// stream length (aka off_t)
+typedef uint64_t length;
+// seek set/cur/end type:
+typedef int seek_dir;
 
-enum seek_dir {
+enum seek_dirs {
   seek_beg = 0,
   seek_cur = 1,
   seek_end = 2,
 };
 
-typedef int (*read_fn)(struct cxx11_stream* self, byte* buffer, int size);
-typedef int (*write_fn)(struct cxx11_stream* self, const byte* buffer,
-                        int size);
-typedef int64_t (*seek_fn)(struct cxx11_stream* self, int64_t off,
-                           int seek_dir);
-typedef int (*flush_fn)(struct cxx11_stream* self);
+typedef int (*read_fn)(byte* buffer, size count);
+typedef int (*write_fn)(const byte* buffer, size count);
+typedef offset (*seek_fn)(offset off, seek_dir dir);
+typedef int (*flush_fn)();
+typedef int (*trunc_fn)(length size);
 
-struct cxx11_stream {
-  read_fn read;
-  write_fn write;
-  seek_fn seek;
-  flush_fn flush;
-};
+// opaque type:
+struct c11_stream;
+CXX11_BINDINGS_EXPORT struct c11_stream* c11_stream_create(
+    read_fn read, write_fn write, seek_fn seek, flush_fn flush, trunc_fn trunc);
+CXX11_BINDINGS_EXPORT int c11_stream_delete(struct c11_stream* c11_stream);
 
-CXX11_BINDINGS_EXPORT struct cxx11_stream* cxx11_stream_create(read_fn read,
-                                                               write_fn write,
-                                                               flush_fn flush,
-                                                               seek_fn seek);
-CXX11_BINDINGS_EXPORT int cxx11_stream_delete(
-    struct cxx11_stream* cxx11_stream);
+// opaque std::streambuf with c++11 ABI:
+struct cxx11_streambuf;
+CXX11_BINDINGS_EXPORT struct cxx11_streambuf* cxx11_streambuf_create(
+    read_fn read, write_fn write, seek_fn seek, flush_fn flush);
+CXX11_BINDINGS_EXPORT struct cxx11_streambuf* cxx11_streambuf_create_buffer(
+    read_fn read, write_fn write, seek_fn seek, flush_fn flush, byte* buf,
+    size count);
+CXX11_BINDINGS_EXPORT int cxx11_streambuf_delete(
+    struct cxx11_streambuf* cxx11_streambuf);
 
 #ifdef __cplusplus
 }  // end extern "C"

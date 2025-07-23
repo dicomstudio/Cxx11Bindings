@@ -35,14 +35,15 @@ set(CXX11_API ${CXX11_ABI} cxx11bindings.hxx)
 # set_source_files_properties(cxx11bindings.h PROPERTIES LANGUAGE C)
 set(SOURCES
     ${CXX11_API}
-    managed_streambuf.cxx
     c11_filebuf.cxx
     cxx11_filebuf.cxx
-    public.h
-    stream_interface.hxx
-    stream_implementation.hxx
+    cxx11bindings.cxx
     io_ops.cxx
-    std_streambuf.hxx)
+    managed_streambuf.cxx
+    public.h
+    std_streambuf.hxx
+    stream_implementation.hxx
+    stream_interface.hxx)
 # shared obj lib
 add_library(${PLUGIN_NAME}_obj OBJECT ${SOURCES})
 set_target_properties(${PLUGIN_NAME}_obj PROPERTIES POSITION_INDEPENDENT_CODE
