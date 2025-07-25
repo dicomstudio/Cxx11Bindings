@@ -18,8 +18,8 @@ typedef uint8_t byte;
 typedef int64_t offset;
 // buffer size (aka size_t)
 typedef uint32_t size;
-// stream length (aka off_t)
-typedef uint64_t length;
+// stream length (aka off_t), std::streamsize seems to be signed in c++
+typedef int64_t length;
 // seek set/cur/end type:
 typedef int seek_dir;
 

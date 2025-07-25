@@ -2,6 +2,8 @@
 #include "cxx11bindings.h"
 #include "cxx11exceptions.hxx"
 
+#include <vector>
+
 namespace cxx11 {
 class stream_interface {
  public:
@@ -18,7 +20,7 @@ class stream_interface {
   virtual offset seek(offset off, seek_dir dir) = 0;
   virtual int flush() = 0;
 
-  virtual int trunc(length size) {
+  virtual int trunc(length) {
     return static_cast<int>(CxxExceptionCode::NotImplemented);
   }
 };
@@ -157,13 +159,13 @@ class simple_streambuf final : public std::streambuf {
 
   // Override seekoff for seeking by offset
   pos_type seekoff(const off_type off, const std::ios_base::seekdir dir,
-                   std::ios_base::openmode which) override {
+                   std::ios_base::openmode) override {
     const offset ret = c11_stream_->seek(static_cast<offset>(off), dir);
     return ret;
   }
 
   // Override seekpos for seeking to an absolute position
-  pos_type seekpos(const pos_type pos, std::ios_base::openmode which) override {
+  pos_type seekpos(const pos_type pos, std::ios_base::openmode) override {
     const offset ret =
         c11_stream_->seek(static_cast<offset>(pos), std::ios_base::beg);
     return ret;
@@ -188,6 +190,102 @@ class simple_streambuf final : public std::streambuf {
     return this->gptr() == this->egptr()
                ? traits_type::eof()
                : traits_type::to_int_type(*this->gptr());
+  }
+};
+
+class c11_streambuf : public std::streambuf {
+  c11_stream* stream_;
+  std::vector<char> buffer_;
+
+ public:
+  c11_streambuf(c11_stream* s, std::size_t bufsize = 4096)
+      : stream_(s), buffer_(bufsize) {
+    if (!stream_) {
+      throw std::invalid_argument("file pointer is null");
+    }
+    setg(buffer_.data(), buffer_.data() + buffer_.size(),
+         buffer_.data() + buffer_.size());
+    setp(buffer_.data(), buffer_.data() + buffer_.size());
+  }
+
+  ~c11_streambuf() override { sync(); }
+
+ protected:
+  // Input
+  int_type underflow() override {
+    if (gptr() < egptr()) {
+      return traits_type::to_int_type(*gptr());
+    }
+    // if (!stream_ || !stream_->read) return traits_type::eof();
+    const int n = stream_->read(reinterpret_cast<byte*>(buffer_.data()),
+                                static_cast<size>(buffer_.size()));
+    if (n < 0) {
+      assert(0);
+    }
+    if (n == 0) {
+      return traits_type::eof();
+    }
+    setg(buffer_.data(), buffer_.data(), buffer_.data() + n);
+    return traits_type::to_int_type(*gptr());
+  }
+
+  // Output
+  int_type overflow(int_type ch = traits_type::eof()) override {
+    // if (!stream_ || !stream_->write) return traits_type::eof();
+    if (pptr() > pbase()) {
+      const size n = static_cast<size>(pptr() - pbase());
+      const int ret = stream_->write(reinterpret_cast<const byte*>(pbase()), n);
+      if (ret < 0) {
+        assert(0);
+      }
+      if (ret != static_cast<int>(n)) {
+        return traits_type::eof();
+      }
+    }
+    setp(buffer_.data(), buffer_.data() + buffer_.size());
+    if (!traits_type::eq_int_type(ch, traits_type::eof())) {
+      *pptr() = traits_type::to_char_type(ch);
+      pbump(1);
+    }
+    return traits_type::not_eof(ch);
+  }
+
+  int sync() override {
+    if (overflow() == traits_type::eof()) {
+      return -1;
+    }
+    return stream_->flush() == 0 ? 0 : -1;
+  }
+
+  std::streampos seekoff(const std::streamoff off,
+                         const std::ios_base::seekdir dir,
+                         const std::ios_base::openmode which) override {
+    // if (!stream_ || !stream_->seek) return -1;
+    seek_dir cdir;
+    if (dir == std::ios_base::beg) {
+      cdir = seek_beg;
+    } else if (dir == std::ios_base::cur) {
+      cdir = seek_cur;
+    } else if (dir == std::ios_base::end) {
+      cdir = seek_end;
+    } else {
+      return {-1};
+    }
+
+    // Only flush if seeking in output mode
+    if (which & std::ios_base::out) {
+      if (stream_->flush() != 0) {
+        return {-1};
+      }
+    }
+    const offset pos = stream_->seek(off, cdir);
+    return pos < 0 ? -1 : pos;
+  }
+
+  std::streampos seekpos(std::streampos sp,
+                         std::ios_base::openmode which =
+                             std::ios_base::in | std::ios_base::out) override {
+    return seekoff(sp, std::ios_base::beg, which);
   }
 };
 
