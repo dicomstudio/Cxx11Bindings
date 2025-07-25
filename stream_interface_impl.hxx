@@ -101,7 +101,7 @@ class cfile_stream final : public stream_interface {
         return static_cast<int>(CxxExceptionCode::InvalidArgument);
     }
     const int ret = fseek_file_fp(stream_, off, whence);
-    return ret == -1 ? -1 : static_cast<offset>(ftell_file_fp(stream_));
+    return ret == -1 ? -1 : ftell_file_fp(stream_);
   }
 
   int flush() override {

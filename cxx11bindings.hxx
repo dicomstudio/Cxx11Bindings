@@ -78,12 +78,12 @@ class c_stream final : public stream_interface {
 
 /* Virtual buffer. No allocation done, simply provides
  * access to the virtual buffer memory */
-class virtual_buffer {
+class external_buffer {
   byte* data_;
   size count_;
 
  public:
-  explicit virtual_buffer(byte* data, const size count)
+  explicit external_buffer(byte* data, const size count)
       : data_(data), count_(count) {
     if (count < 1 || count > 0x7ffff000) {
       throw std::runtime_error("invalid size");
@@ -97,25 +97,25 @@ class virtual_buffer {
 
 // https://stackoverflow.com/questions/14086417/how-to-write-custom-input-stream-in-c
 // https://stackoverflow.com/questions/22116158/whats-wrong-with-this-stream-buffer
-class simple_streambuf final : public std::streambuf {
-  virtual_buffer buffer_;
-  c11_stream* c11_stream_;
+class external_streambuf final : public std::streambuf {
+  external_buffer buffer_;
+  stream_interface* c11_stream_;
 
  public:
-  simple_streambuf(const simple_streambuf& other) = delete;
-  simple_streambuf(simple_streambuf&& other) noexcept = delete;
-  simple_streambuf& operator=(const simple_streambuf& other) = delete;
-  simple_streambuf& operator=(simple_streambuf&& other) noexcept = delete;
+  external_streambuf(const external_streambuf& other) = delete;
+  external_streambuf(external_streambuf&& other) noexcept = delete;
+  external_streambuf& operator=(const external_streambuf& other) = delete;
+  external_streambuf& operator=(external_streambuf&& other) noexcept = delete;
 
-  explicit simple_streambuf(const virtual_buffer& buffer,
-                            c11_stream* c11_stream)
-      : buffer_(buffer), c11_stream_(c11_stream) {
+  explicit external_streambuf(const external_buffer& buffer,
+                              stream_interface* stream)
+      : buffer_(buffer), c11_stream_(stream) {
     // -1 trick:
     this->setp(this->buffer_.data(),
                this->buffer_.data() + this->buffer_.count() - 1);
   }
 
-  ~simple_streambuf() override { sync(); }
+  ~external_streambuf() override { sync(); }
 
  private:
   int_type overflow(const int_type i) override {
@@ -193,12 +193,12 @@ class simple_streambuf final : public std::streambuf {
   }
 };
 
-class c11_streambuf : public std::streambuf {
-  c11_stream* stream_;
+class buffered_streambuf final : public std::streambuf {
+  stream_interface* stream_;
   std::vector<char> buffer_;
 
  public:
-  c11_streambuf(c11_stream* s, std::size_t bufsize = 4096)
+  buffered_streambuf(stream_interface* s, std::size_t bufsize = 4096)
       : stream_(s), buffer_(bufsize) {
     if (!stream_) {
       throw std::invalid_argument("file pointer is null");
@@ -208,7 +208,7 @@ class c11_streambuf : public std::streambuf {
     setp(buffer_.data(), buffer_.data() + buffer_.size());
   }
 
-  ~c11_streambuf() override { sync(); }
+  ~buffered_streambuf() override { sync(); }
 
  protected:
   // Input
@@ -288,166 +288,77 @@ class c11_streambuf : public std::streambuf {
   }
 };
 
-template <int N = 4096>
-class buffered_streambuf final : public std::streambuf {
+class nobuffer_streambuf : public std::streambuf {
   stream_interface* stream_;
-  char buffer_[N];
+  char last_char;
 
  public:
-  buffered_streambuf(const buffered_streambuf& other) = delete;
-  buffered_streambuf(buffered_streambuf&& other) noexcept = delete;
-  buffered_streambuf& operator=(const buffered_streambuf& other) = delete;
-  buffered_streambuf& operator=(buffered_streambuf&& other) noexcept = delete;
-
-  explicit buffered_streambuf(stream_interface* stream = nullptr)
-      : stream_(stream) {
+  explicit nobuffer_streambuf(stream_interface* file) : stream_(file) {
     if (!stream_) {
-      throw null_pointer();
+      throw std::invalid_argument("file pointer is null");
     }
-    setg(buffer_, buffer_, buffer_);
-    setp(buffer_, buffer_ + sizeof(buffer_));
+    setg(nullptr, nullptr, nullptr);
+    setp(nullptr, nullptr);
   }
-
-  ~buffered_streambuf() override {
-    if (stream_) {
-      close();
-    }
-  }
-
-#if 0
-    bool open(const char* filename, const char* mode) {
-        file_ = std::fopen(filename, mode);
-        return file_ != nullptr;
-    }
-
-    void close() {
-        sync();
-        if (file_) std::fclose(file_);
-        file_ = nullptr;
-    }
-#else
-  void close() {
-    sync();
-    // FIXME: what if flush returns error?
-    if (stream_) {
-      stream_->flush();
-    }
-    stream_ = nullptr;
-  }
-#endif
 
  protected:
   int_type underflow() override {
-    if (!stream_) {
-      throw null_pointer();
+    char c;
+    const int n = stream_->read(reinterpret_cast<byte*>(&c), 1);
+    if (n < 0) {
+      assert(0);
     }
-#if 0
-    size_t n = std::fread(buffer_, 1, sizeof(buffer_), file_);
-#else
-    auto n = stream_->read(reinterpret_cast<byte*>(buffer_), sizeof(buffer_));
-    throw_exception_from_int(n, "read error");
-#endif
     if (n == 0) {
       return traits_type::eof();
     }
-    setg(buffer_, buffer_, buffer_ + n);
-    return traits_type::to_int_type(*gptr());
+    // Store the character in a static buffer for gptr/egptr contract
+    last_char = c;
+    setg(&last_char, &last_char, &last_char + 1);
+    return traits_type::to_int_type(c);
   }
 
-  int_type overflow(const int_type ch = traits_type::eof()) override {
-    if (!stream_) {
-      throw null_pointer();
+  int_type overflow(int_type ch = traits_type::eof()) override {
+    if (traits_type::eq_int_type(ch, traits_type::eof())) {
+      return traits_type::not_eof(ch);
     }
-    if (pptr() == pbase()) {
+    char c = traits_type::to_char_type(ch);
+    const int ret = stream_->write(reinterpret_cast<const byte*>(&c), 1);
+    if (ret < 0) {
+      assert(0);
+    }
+    if (ret != 1) {
       return traits_type::eof();
     }
-#if 0
-    size_t n = pptr() - pbase();
-        size_t written = std::fwrite(pbase(), 1, n, file_);
-#else
-    auto n = pptr() - pbase();
-    auto written = stream_->write(reinterpret_cast<byte*>(pbase()), n);
-    throw_exception_from_int(written, "write error");
-#endif
-    setp(buffer_, buffer_ + sizeof(buffer_));
-    if (ch != traits_type::eof()) {
-      *pptr() = traits_type::to_char_type(ch);
-      pbump(1);
-    }
-    return written == n ? ch : traits_type::eof();
+    return ch;
   }
 
-  int sync() override {
-    if (!stream_) {
-      throw null_pointer();
-    }
-    return stream_->flush();
-  }
+  int sync() override { return stream_->flush() == 0 ? 0 : -1; }
 
-  std::streamsize xsputn(const char_type* s, const std::streamsize n) override {
-    // by default sputn is optimized for small writes, we must implement this to
-    // trigger edge cases
-    if (!stream_) {
-      throw null_pointer();
-    }
-    const auto written = stream_->write(reinterpret_cast<const byte*>(s), n);
-    throw_exception_from_int(written, "write error 2");
-    if (written > 0) {
-      pbump(static_cast<int>(written));
-    }
-    return written;
-  }
-
-  pos_type seekoff(const off_type off, const std::ios_base::seekdir way,
-                   const std::ios_base::openmode which) override {
-    if (!stream_) {
-      throw null_pointer();
-    }
-    (void)which;
-#if 0
-    int whence;
-    if (way == std::ios_base::beg) whence = SEEK_SET;
-    else if (way == std::ios_base::cur) whence = SEEK_CUR;
-    else if (way == std::ios_base::end) whence = SEEK_END;
-    else
-      throw std::ios_base::failure("invalid dir");
-        if (std::fseek(file_, off, whence) != 0) return pos_type(-1);
-        return std::ftell(file_);
-#else
-    int whence;
-    if (way == std::ios_base::beg) {
-      whence = seek_dirs::seek_beg;
-    } else if (way == std::ios_base::cur) {
-      whence = seek_dirs::seek_cur;
-    } else if (way == std::ios_base::end) {
-      whence = seek_dirs::seek_end;
+  pos_type seekoff(off_type off, std::ios_base::seekdir dir,
+                   std::ios_base::openmode which) override {
+    seek_dir cdir;
+    if (dir == std::ios_base::beg) {
+      cdir = seek_beg;
+    } else if (dir == std::ios_base::cur) {
+      cdir = seek_cur;
+    } else if (dir == std::ios_base::end) {
+      cdir = seek_end;
     } else {
-      // throw std::invalid_argument("invalid way");
-      return -1;
+      return {-1};
     }
-    const auto pos = stream_->seek(off, whence);
-    // throw_exception_from_long_long(pos, "seekoff error");
-    //  must return {-1} if seek operation fails
-    return pos;
-#endif
+
+    // Only flush if seeking in output mode
+    if (which & std::ios_base::out) {
+      if (stream_->flush() != 0) {
+        return {-1};
+      }
+    }
+    const offset pos = stream_->seek(off, cdir);
+    return pos < 0 ? -1 : pos;
   }
 
-  pos_type seekpos(const pos_type pos,
-                   const std::ios_base::openmode which) override {
-#if 0
-        if (std::fseek(file_, pos, SEEK_SET) != 0) return pos_type(-1);
-        return std::ftell(file_);
-#else
-    const auto new_pos = stream_->seek(pos, seek_dirs::seek_beg);
-    // throw_exception_from_long_long(new_pos, "seekpos error");
-    // must return {-1} if seek operation fails
-    return new_pos;
-#endif
+  pos_type seekpos(pos_type pos, std::ios_base::openmode which) override {
+    return seekoff(pos, std::ios_base::beg, which);
   }
 };
-
-// no internal buffering, rely on DefaultStreamInterface implementation detail
-// simply forwards calls to the DefaultStreamInterface methods
-typedef buffered_streambuf<> default_streambuf;
-typedef buffered_streambuf<1> nobuffer_streambuf;
 }  // namespace cxx11
