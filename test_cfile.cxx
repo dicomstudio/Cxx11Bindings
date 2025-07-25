@@ -1,5 +1,4 @@
-#include "stream_implementation.hxx"
-#include "stream_interface.hxx"
+#include "stream_interface_impl.hxx"
 
 #include <fstream>  // std::filebuf
 #include <gtest/gtest.h>
@@ -21,7 +20,7 @@ TEST(FileComparison, WriteAndRead) {
   {
     FILE *impl;
     impl = fopen(filename, "rb");
-    cxx11::cfile_adapter adapter(impl);
+    cxx11::cfile_stream adapter(impl);
     cxx11::default_streambuf fb(&adapter);
     std::istream is(&fb);
     is.read(&custom_read[0], data.size());

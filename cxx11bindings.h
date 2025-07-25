@@ -10,8 +10,6 @@
 extern "C" {
 #endif
 
-// https://stackoverflow.com/questions/29631692/self-referencing-class-concrete-python-class-from-c-interface
-
 // On  Linux,  write()  (and similar system calls) will transfer at most
 // 0x7ffff000 (2,147,479,552) bytes, returning the number of bytes actually
 // transferred.
@@ -31,27 +29,30 @@ enum seek_dirs {
   seek_end = 2,
 };
 
+// callbacks for stream interface
 typedef int (*read_fn)(byte* buffer, size count);
 typedef int (*write_fn)(const byte* buffer, size count);
 typedef offset (*seek_fn)(offset off, seek_dir dir);
 typedef int (*flush_fn)();
 typedef int (*trunc_fn)(length size);
 
-// opaque type:
-struct c11_stream;
+// https://stackoverflow.com/questions/29631692/self-referencing-class-concrete-python-class-from-c-interface
+// Provides a simple basic stream interface, no buffering logic. Simply forward
+// calls to actual implementation this is meant to provide a bridge from c# to
+// c/c++
+struct c11_stream {
+  read_fn read;
+  write_fn write;
+  seek_fn seek;
+  flush_fn flush;
+  trunc_fn trunc;
+};
+
+// C ABI to be used from C#P/Invoke of Python.ctypes
 CXX11_BINDINGS_EXPORT struct c11_stream* c11_stream_create(
     read_fn read, write_fn write, seek_fn seek, flush_fn flush, trunc_fn trunc);
-CXX11_BINDINGS_EXPORT int c11_stream_delete(struct c11_stream* c11_stream);
-
-// opaque std::streambuf with c++11 ABI:
-struct cxx11_streambuf;
-CXX11_BINDINGS_EXPORT struct cxx11_streambuf* cxx11_streambuf_create(
-    read_fn read, write_fn write, seek_fn seek, flush_fn flush);
-CXX11_BINDINGS_EXPORT struct cxx11_streambuf* cxx11_streambuf_create_buffer(
-    read_fn read, write_fn write, seek_fn seek, flush_fn flush, byte* buf,
-    size count);
-CXX11_BINDINGS_EXPORT int cxx11_streambuf_delete(
-    struct cxx11_streambuf* cxx11_streambuf);
+CXX11_BINDINGS_EXPORT int c11_stream_delete(
+    const struct c11_stream* c11_stream);
 
 #ifdef __cplusplus
 }  // end extern "C"

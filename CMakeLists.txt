@@ -30,15 +30,10 @@ set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 
 # sources
 set(CXX11_ABI cxx11bindings.h)
-set(CXX11_API ${CXX11_ABI} cxx11bindings.hxx)
+set(CXX11_API ${CXX11_ABI} cxx11bindings.hxx cxx11exceptions.hxx)
 # no way to teach cmake that *.h is actually a C header
 # set_source_files_properties(cxx11bindings.h PROPERTIES LANGUAGE C)
-set(SOURCES
-    ${CXX11_API}
-    cxx11bindings.cxx
-    io_ops.cxx
-    stream_implementation.hxx
-    stream_interface.hxx)
+set(SOURCES ${CXX11_API} cxx11bindings.cxx stream_interface_impl.hxx)
 # shared obj lib
 add_library(${PLUGIN_NAME}_obj OBJECT ${SOURCES})
 set_target_properties(${PLUGIN_NAME}_obj PROPERTIES POSITION_INDEPENDENT_CODE
@@ -78,7 +73,7 @@ install(
   ARCHIVE DESTINATION lib COMPONENT libraries)
 
 install(
-  FILES ${CXX11_ABI}
+  FILES ${CXX11_API}
   DESTINATION include
   COMPONENT headers)
 

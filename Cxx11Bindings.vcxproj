@@ -39,13 +39,12 @@
   </ItemDefinitionGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
   <ItemGroup>
-    <ClCompile Include="io_ops.cxx" />
     <ClCompile Include="cxx11bindings.cxx" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="stream_interface.hxx" />
-    <ClInclude Include="stream_implementation.hxx" />
+    <ClInclude Include="stream_interface_impl.hxx" />
     <ClCompile Include="cxx11bindings.hxx" />
+    <ClCompile Include="cxx11exceptions.hxx" />
     <ClCompile Include="cxx11bindings.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Targets" />
