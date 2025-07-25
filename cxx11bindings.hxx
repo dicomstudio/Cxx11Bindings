@@ -275,16 +275,15 @@ class c11_streambuf : public std::streambuf {
     // Only flush if seeking in output mode
     if (which & std::ios_base::out) {
       if (stream_->flush() != 0) {
-        return {-1};
+        return -1;
       }
     }
     const offset pos = stream_->seek(off, cdir);
     return pos < 0 ? -1 : pos;
   }
 
-  std::streampos seekpos(std::streampos sp,
-                         std::ios_base::openmode which =
-                             std::ios_base::in | std::ios_base::out) override {
+  std::streampos seekpos(const std::streampos sp,
+                         const std::ios_base::openmode which) override {
     return seekoff(sp, std::ios_base::beg, which);
   }
 };
