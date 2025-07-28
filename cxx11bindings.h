@@ -17,7 +17,7 @@ typedef uint8_t byte;
 // stream offset (aka off_t)
 typedef int64_t offset;
 // buffer size (aka size_t)
-typedef uint32_t size;
+typedef int32_t size;
 // stream length (aka off_t), std::streamsize seems to be signed in c++
 typedef int64_t length;
 // seek set/cur/end type:
@@ -30,8 +30,8 @@ enum seek_dirs {
 };
 
 // callbacks for stream interface
-typedef int (*read_fn)(byte* buffer, size count);
-typedef int (*write_fn)(const byte* buffer, size count);
+typedef size (*read_fn)(byte* buffer, size count);
+typedef size (*write_fn)(const byte* buffer, size count);
 typedef offset (*seek_fn)(offset off, seek_dir dir);
 typedef int (*flush_fn)();
 typedef int (*trunc_fn)(length size);
