@@ -15,8 +15,8 @@
 #endif
 
 // Truncate an open FILE* stream to a given size (in bytes).
-// Returns 0 on success, -1 on error.
-static inline int truncate_file_fp(FILE* fp, int64_t new_size) {
+// Returns new size on success, -1 on error.
+static inline int64_t truncate_file_fp(FILE* fp, int64_t new_size) {
   if (!fp || new_size < 0) {
     return -1;
   }
@@ -41,7 +41,7 @@ static inline int truncate_file_fp(FILE* fp, int64_t new_size) {
   }
 #endif
 
-  return 0;
+  return new_size;
 }
 
 static inline int fseek_file_fp(FILE* stream, int64_t offset, int whence) {
@@ -66,23 +66,23 @@ class cfile_stream final : public stream_interface {
  public:
   explicit cfile_stream(FILE* stream) : stream_(stream) {}
 
-  int read(byte* buf, const size count) override {
+  buf_size read(byte* buf, const buf_size count) override {
     if (!stream_) {
       return static_cast<int>(CxxExceptionCode::NullPointer);
     }
     const size_t ret = fread(buf, 1, count, stream_);
-    return static_cast<int>(ret);
+    return static_cast<buf_size>(ret);
   }
 
-  int write(const byte* buf, const size count) override {
+  buf_size write(const byte* buf, const buf_size count) override {
     if (!stream_) {
       return static_cast<int>(CxxExceptionCode::NullPointer);
     }
     const size_t ret = fwrite(buf, 1, count, stream_);
-    return static_cast<int>(ret);
+    return static_cast<buf_size>(ret);
   }
 
-  offset seek(const offset off, const seek_dir dir) override {
+  stream_offset seek(const stream_offset off, const seek_dir dir) override {
     if (!stream_) {
       return static_cast<int>(CxxExceptionCode::NullPointer);
     }
@@ -98,7 +98,7 @@ class cfile_stream final : public stream_interface {
         whence = SEEK_END;
         break;
       default:
-        return static_cast<int>(CxxExceptionCode::InvalidArgument);
+        return static_cast<stream_offset>(CxxExceptionCode::InvalidArgument);
     }
     const int ret = fseek_file_fp(stream_, off, whence);
     return ret == -1 ? -1 : ftell_file_fp(stream_);
@@ -118,7 +118,7 @@ class cfile_stream final : public stream_interface {
     return -1;  // static_cast<int>(ErrorCode::IoFailure);
   }
 
-  int trunc(const length size) override {
+  stream_length trunc(const stream_length size) override {
     return truncate_file_fp(stream_, size);
   }
 
@@ -131,12 +131,12 @@ class stream_streambuf final : public stream_interface {
  public:
   explicit stream_streambuf(std::streambuf* stream) : stream_(stream) {}
 
-  int read(byte* buf, const size count) override {
+  buf_size read(byte* buf, const buf_size count) override {
     if (!stream_) {
       return static_cast<int>(CxxExceptionCode::NullPointer);
     }
-    int n = 0;
-    for (; n < static_cast<int>(count); ++n) {
+    buf_size n = 0;
+    for (; n < count; ++n) {
       const int c = stream_->sbumpc();
       if (c == std::char_traits<char>::eof()) {
         break;
@@ -146,12 +146,12 @@ class stream_streambuf final : public stream_interface {
     return n;
   }
 
-  int write(const byte* buf, const size count) override {
+  buf_size write(const byte* buf, const buf_size count) override {
     if (!stream_) {
       return static_cast<int>(CxxExceptionCode::NullPointer);
     }
-    int n = 0;
-    for (; n < static_cast<int>(count); ++n) {
+    buf_size n = 0;
+    for (; n < count; ++n) {
       if (stream_->sputc(static_cast<char>(buf[n])) ==
           std::char_traits<char>::eof()) {
         break;
@@ -160,7 +160,7 @@ class stream_streambuf final : public stream_interface {
     return n;
   }
 
-  offset seek(const offset off, const seek_dir dir) override {
+  stream_offset seek(const stream_offset off, const seek_dir dir) override {
     if (!stream_) {
       return static_cast<int>(CxxExceptionCode::NullPointer);
     }
@@ -180,7 +180,7 @@ class stream_streambuf final : public stream_interface {
     }
     const auto pos =
         stream_->pubseekoff(off, sd, std::ios_base::in | std::ios_base::out);
-    return pos == std::streampos(-1) ? -1 : static_cast<offset>(pos);
+    return pos == std::streampos(-1) ? -1 : static_cast<stream_offset>(pos);
   }
 
   int flush() override {

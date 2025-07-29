@@ -3,24 +3,6 @@
 #include <fstream>  // std::filebuf
 #include <gtest/gtest.h>
 
-TEST(HelloWorld, Test) {
-  int i = 0;
-  EXPECT_EQ(0, i);
-}
-
-class HelloWorldFixture : public ::testing::Test {
- protected:
-  int i;
-
-  void SetUp() override {
-    i = 0;  // common setup
-  }
-};
-
-TEST_F(HelloWorldFixture, Test1) { EXPECT_EQ(0, i); }
-
-TEST_F(HelloWorldFixture, Test2) { EXPECT_EQ(i, 0); }
-
 TEST(FileBufComparison, WriteAndRead) {
   auto filename = "testfile.txt";
   const std::string data = "Hello, filebuf!";

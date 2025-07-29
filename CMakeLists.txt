@@ -86,6 +86,10 @@ if(BUILD_TESTING)
   find_package(GTest CONFIG REQUIRED)
   include(GoogleTest)
   add_executable(${PROJECT_NAME}_tests test_streambuf.cxx test_cfile.cxx)
+  if(MSVC)
+    target_compile_definitions(${PROJECT_NAME}_tests
+                               PRIVATE _CRT_SECURE_NO_WARNINGS)
+  endif()
   target_link_libraries(
     ${PROJECT_NAME}_tests PRIVATE ${PLUGIN_NAME}_shared GTest::gtest_main
                                   GTest::gtest)

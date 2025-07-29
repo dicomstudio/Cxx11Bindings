@@ -24,6 +24,7 @@ TEST(FileComparison, WriteAndRead) {
     cxx11::buffered_streambuf fb(&adapter);
     std::istream is(&fb);
     is.read(&custom_read[0], data.size());
+    fclose(impl);
   }
 
   // Read using std::filebuf

@@ -15,12 +15,12 @@ class stream_interface {
   stream_interface() = default;
   virtual ~stream_interface() = default;
 
-  virtual int read(byte* buf, size count) = 0;
-  virtual int write(const byte* buf, size count) = 0;
-  virtual offset seek(offset off, seek_dir dir) = 0;
+  virtual buf_size read(byte* buf, buf_size count) = 0;
+  virtual buf_size write(const byte* buf, buf_size count) = 0;
+  virtual stream_offset seek(stream_offset off, seek_dir dir) = 0;
   virtual int flush() = 0;
 
-  virtual int trunc(length) {
+  virtual stream_length trunc(stream_length) {
     return static_cast<int>(CxxExceptionCode::NotImplemented);
   }
 };
@@ -40,25 +40,25 @@ class c_stream final : public stream_interface {
 
   ~c_stream() override = default;
 
-  int read(byte* buf, const size count) override {
+  buf_size read(byte* buf, const buf_size count) override {
     if (c11_stream_->read) {
       return c11_stream_->read(buf, count);
     }
-    return static_cast<int>(CxxExceptionCode::NotImplemented);
+    return static_cast<buf_size>(CxxExceptionCode::NotImplemented);
   }
 
-  int write(const byte* buf, const size count) override {
+  buf_size write(const byte* buf, const buf_size count) override {
     if (c11_stream_->write) {
       return c11_stream_->write(buf, count);
     }
-    return static_cast<int>(CxxExceptionCode::NotImplemented);
+    return static_cast<buf_size>(CxxExceptionCode::NotImplemented);
   }
 
-  offset seek(const offset off, const seek_dir dir) override {
+  stream_offset seek(const stream_offset off, const seek_dir dir) override {
     if (c11_stream_->seek) {
       return c11_stream_->seek(off, dir);
     }
-    return static_cast<offset>(CxxExceptionCode::NotImplemented);
+    return static_cast<stream_offset>(CxxExceptionCode::NotImplemented);
   }
 
   int flush() override {
@@ -68,11 +68,11 @@ class c_stream final : public stream_interface {
     return static_cast<int>(CxxExceptionCode::NotImplemented);
   }
 
-  int trunc(const length size) override {
+  stream_length trunc(const stream_length size) override {
     if (c11_stream_->trunc) {
       return c11_stream_->trunc(size);
     }
-    return static_cast<int>(CxxExceptionCode::NotImplemented);
+    return static_cast<stream_length>(CxxExceptionCode::NotImplemented);
   }
 };
 
@@ -80,10 +80,10 @@ class c_stream final : public stream_interface {
  * access to the virtual buffer memory */
 class external_buffer {
   byte* data_;
-  size count_;
+  size_t count_;
 
  public:
-  explicit external_buffer(byte* data, const size count)
+  explicit external_buffer(byte* data, const buf_size count)
       : data_(data), count_(count) {
     if (count < 1 || count > 0x7ffff000) {
       throw std::runtime_error("invalid size");
@@ -92,7 +92,7 @@ class external_buffer {
 
   char* data() const { return reinterpret_cast<char*>(data_); }
   byte* bytes() const { return data_; }
-  size count() const { return count_; }
+  buf_size count() const { return static_cast<buf_size>(count_); }
 };
 
 // https://stackoverflow.com/questions/14086417/how-to-write-custom-input-stream-in-c
@@ -126,7 +126,7 @@ class external_streambuf final : public std::streambuf {
 
       if (sync_impl()) {
         // pbump(-(pptr() - pbase()));
-        pbump(-static_cast<int>(this->buffer_.count()));
+        pbump(-this->buffer_.count());
         return i;
       }
       return traits_type::eof();
@@ -147,10 +147,10 @@ class external_streambuf final : public std::streambuf {
 
   // helper:
   bool sync_impl() {
-    const int num = static_cast<int>(pptr() - pbase());
+    const buf_size num = static_cast<buf_size>(pptr() - pbase());
     // const int size = this->buffer_.write(num);
-    const auto buf = reinterpret_cast<const byte*>(this->buffer_.data());
-    const int size = c11_stream_->write(buf, num);
+    const auto buf = this->buffer_.bytes();
+    const auto size = c11_stream_->write(buf, num);
     if (size < 0) {
       throw std::ios_base::failure("there");
     }
@@ -160,14 +160,24 @@ class external_streambuf final : public std::streambuf {
   // Override seekoff for seeking by offset
   pos_type seekoff(const off_type off, const std::ios_base::seekdir dir,
                    std::ios_base::openmode) override {
-    const offset ret = c11_stream_->seek(static_cast<offset>(off), dir);
+    seek_dir cdir;
+    if (dir == std::ios_base::beg) {
+      cdir = seek_beg;
+    } else if (dir == std::ios_base::cur) {
+      cdir = seek_cur;
+    } else if (dir == std::ios_base::end) {
+      cdir = seek_end;
+    } else {
+      return {-1};
+    }
+
+    const stream_offset ret = c11_stream_->seek(off, cdir);
     return ret;
   }
 
   // Override seekpos for seeking to an absolute position
   pos_type seekpos(const pos_type pos, std::ios_base::openmode) override {
-    const offset ret =
-        c11_stream_->seek(static_cast<offset>(pos), std::ios_base::beg);
+    const stream_offset ret = c11_stream_->seek(pos, seek_dirs::seek_beg);
     return ret;
   }
 
@@ -198,8 +208,8 @@ class buffered_streambuf final : public std::streambuf {
   std::vector<char> buffer_;
 
  public:
-  buffered_streambuf(stream_interface* s, std::size_t bufsize = 4096)
-      : stream_(s), buffer_(bufsize) {
+  explicit buffered_streambuf(stream_interface* s, std::size_t buf_size = 4096)
+      : stream_(s), buffer_(buf_size) {
     if (!stream_) {
       throw std::invalid_argument("file pointer is null");
     }
@@ -218,7 +228,7 @@ class buffered_streambuf final : public std::streambuf {
     }
     // if (!stream_ || !stream_->read) return traits_type::eof();
     const int n = stream_->read(reinterpret_cast<byte*>(buffer_.data()),
-                                static_cast<size>(buffer_.size()));
+                                static_cast<buf_size>(buffer_.size()));
     if (n < 0) {
       assert(0);
     }
@@ -233,7 +243,7 @@ class buffered_streambuf final : public std::streambuf {
   int_type overflow(int_type ch = traits_type::eof()) override {
     // if (!stream_ || !stream_->write) return traits_type::eof();
     if (pptr() > pbase()) {
-      const size n = static_cast<size>(pptr() - pbase());
+      const buf_size n = static_cast<buf_size>(pptr() - pbase());
       const int ret = stream_->write(reinterpret_cast<const byte*>(pbase()), n);
       if (ret < 0) {
         assert(0);
@@ -278,7 +288,7 @@ class buffered_streambuf final : public std::streambuf {
         return -1;
       }
     }
-    const offset pos = stream_->seek(off, cdir);
+    const stream_offset pos = stream_->seek(off, cdir);
     return pos < 0 ? -1 : pos;
   }
 
@@ -353,7 +363,7 @@ class nobuffer_streambuf : public std::streambuf {
         return {-1};
       }
     }
-    const offset pos = stream_->seek(off, cdir);
+    const stream_offset pos = stream_->seek(off, cdir);
     return pos < 0 ? -1 : pos;
   }
 
