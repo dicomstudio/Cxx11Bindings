@@ -1,4 +1,5 @@
-#pragma once
+#ifndef CXX11EXCEPTIONS_HXX
+#define CXX11EXCEPTIONS_HXX
 
 #include <cassert>
 #include <exception>
@@ -108,3 +109,5 @@ static inline CxxExceptionCode exception_to_code(const std::exception& e) {
   return CxxExceptionCode::Unknown;
 }
 }  // namespace cxx11
+
+#endif  // CXX11EXCEPTIONS_HXX

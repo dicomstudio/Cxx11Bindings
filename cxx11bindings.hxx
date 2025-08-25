@@ -1,4 +1,6 @@
-#pragma once
+#ifndef CXX11BINDINGS_HXX
+#define CXX11BINDINGS_HXX
+
 #include "cxx11bindings.h"
 #include "cxx11exceptions.hxx"
 
@@ -372,3 +374,5 @@ class nobuffer_streambuf : public std::streambuf {
   }
 };
 }  // namespace cxx11
+
+#endif  // CXX11BINDINGS_HXX

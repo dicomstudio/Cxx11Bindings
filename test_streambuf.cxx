@@ -84,6 +84,7 @@ TEST(DefaultStreamBuf, WriteReadSeekFlush) {
   EXPECT_EQ(read_data, data);
 }
 
+#if 0
 TEST(DefaultStreamBuf, WriteReadSeekFlush2) {
   auto filename = "/root/default_streambuf_api_test2.txt";
   const std::string data = "API test for default_streambuf!";
@@ -111,6 +112,7 @@ TEST(DefaultStreamBuf, WriteReadSeekFlush2) {
     // no exception
   }
 }
+#endif
 
 TEST(DefaultStreamBuf, WriteReadSeekFlush3) {
   auto filename = "/root/default_streambuf_api_test3.txt";

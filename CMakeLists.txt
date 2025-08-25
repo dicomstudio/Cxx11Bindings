@@ -31,15 +31,13 @@ set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 # sources
 set(CXX11_ABI cxx11bindings.h)
 set(CXX11_API ${CXX11_ABI} cxx11bindings.hxx cxx11exceptions.hxx)
-# no way to teach cmake that *.h is actually a C header
-# set_source_files_properties(cxx11bindings.h PROPERTIES LANGUAGE C)
-set(SOURCES ${CXX11_API} cxx11bindings.cxx stream_interface_impl.hxx)
+set_source_files_properties(cxx11bindings.h PROPERTIES LANGUAGE C
+                                                       HEADER_FILE_ONLY ON)
+set(SOURCES ${CXX11_API} cxx11bindings.c stream_interface_impl.hxx)
 # shared obj lib
 add_library(${PLUGIN_NAME}_obj OBJECT ${SOURCES})
 set_target_properties(${PLUGIN_NAME}_obj PROPERTIES POSITION_INDEPENDENT_CODE
                                                     ON)
-# fseeko/ftello support:
-target_compile_definitions(${PLUGIN_NAME}_obj PRIVATE _FILE_OFFSET_BITS=64)
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
   target_compile_definitions(${PLUGIN_NAME}_obj
                              PRIVATE _GLIBCXX_USE_CXX11_ABI=1)
@@ -82,6 +80,17 @@ include(CTest)
 if(BUILD_TESTING)
   enable_testing()
 
+  # verify that code can be compiled in C11-only:
+  add_executable(${PROJECT_NAME}_comp test_cfile.c)
+  if(MSVC)
+    target_compile_definitions(${PROJECT_NAME}_comp
+                               PRIVATE _CRT_SECURE_NO_WARNINGS)
+  endif()
+  # fseeko/ftello support:
+  target_compile_definitions(${PROJECT_NAME}_comp PUBLIC _FILE_OFFSET_BITS=64)
+  target_compile_definitions(${PROJECT_NAME}_comp
+                             PUBLIC _POSIX_C_SOURCE=200112L)
+  target_link_libraries(${PROJECT_NAME}_comp ${PLUGIN_NAME}_shared)
   # Define test executable
   find_package(GTest CONFIG REQUIRED)
   include(GoogleTest)
