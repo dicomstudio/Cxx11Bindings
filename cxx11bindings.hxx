@@ -210,8 +210,9 @@ class buffered_streambuf final : public std::streambuf {
   std::vector<char> buffer_;
 
  public:
-  explicit buffered_streambuf(stream_interface* s, std::size_t buf_size = 4096)
-      : stream_(s), buffer_(buf_size) {
+  explicit buffered_streambuf(stream_interface* s,
+                              const std::size_t buffer_size = 4096)
+      : stream_(s), buffer_(buffer_size) {
     if (!stream_) {
       throw std::invalid_argument("file pointer is null");
     }
@@ -228,7 +229,6 @@ class buffered_streambuf final : public std::streambuf {
     if (gptr() < egptr()) {
       return traits_type::to_int_type(*gptr());
     }
-    // if (!stream_ || !stream_->read) return traits_type::eof();
     const int n = stream_->read(reinterpret_cast<byte*>(buffer_.data()),
                                 static_cast<buf_size>(buffer_.size()));
     if (n < 0) {
@@ -242,8 +242,7 @@ class buffered_streambuf final : public std::streambuf {
   }
 
   // Output
-  int_type overflow(int_type ch = traits_type::eof()) override {
-    // if (!stream_ || !stream_->write) return traits_type::eof();
+  int_type overflow(const int_type ch = traits_type::eof()) override {
     if (pptr() > pbase()) {
       const buf_size n = static_cast<buf_size>(pptr() - pbase());
       const int ret = stream_->write(reinterpret_cast<const byte*>(pbase()), n);
@@ -302,7 +301,7 @@ class buffered_streambuf final : public std::streambuf {
 
 class nobuffer_streambuf : public std::streambuf {
   stream_interface* stream_;
-  char last_char;
+  char last_char_;
 
  public:
   explicit nobuffer_streambuf(stream_interface* file) : stream_(file) {
@@ -324,12 +323,12 @@ class nobuffer_streambuf : public std::streambuf {
       return traits_type::eof();
     }
     // Store the character in a static buffer for gptr/egptr contract
-    last_char = c;
-    setg(&last_char, &last_char, &last_char + 1);
+    last_char_ = c;
+    setg(&last_char_, &last_char_, &last_char_ + 1);
     return traits_type::to_int_type(c);
   }
 
-  int_type overflow(int_type ch = traits_type::eof()) override {
+  int_type overflow(const int_type ch = traits_type::eof()) override {
     if (traits_type::eq_int_type(ch, traits_type::eof())) {
       return traits_type::not_eof(ch);
     }
@@ -346,8 +345,8 @@ class nobuffer_streambuf : public std::streambuf {
 
   int sync() override { return stream_->flush() == 0 ? 0 : -1; }
 
-  pos_type seekoff(off_type off, std::ios_base::seekdir dir,
-                   std::ios_base::openmode which) override {
+  pos_type seekoff(const off_type off, const std::ios_base::seekdir dir,
+                   const std::ios_base::openmode which) override {
     seek_dir cdir;
     if (dir == std::ios_base::beg) {
       cdir = seek_beg;
@@ -369,7 +368,8 @@ class nobuffer_streambuf : public std::streambuf {
     return pos < 0 ? -1 : pos;
   }
 
-  pos_type seekpos(pos_type pos, std::ios_base::openmode which) override {
+  pos_type seekpos(const pos_type pos,
+                   const std::ios_base::openmode which) override {
     return seekoff(pos, std::ios_base::beg, which);
   }
 };

@@ -169,16 +169,16 @@ int main(const int argc, char* argv[]) {
     return 1;
   }
   const char* filename = argv[1];
-  struct c11_stream* streambuf;
-  int ret = c11_stream_file_create(&streambuf, filename, "wb");
-  global = (struct stream_file*)streambuf;
+  struct c11_stream* stream;
+  int ret = c11_stream_file_create(&stream, filename, "wb");
+  global = (struct stream_file*)stream;
   if (ret < 0) return 1;
   const char data[] = "Hello, World!";
-  const buf_size size = c11_stream_write(streambuf, data, sizeof data);
+  const buf_size size = c11_stream_write(stream, data, sizeof data);
   if (size < 0) return 1;
-  const stream_length l = c11_stream_trunc(streambuf, 1024);
+  const stream_length l = c11_stream_trunc(stream, 1024);
   if (l < 0) return 1;
-  ret = c11_stream_file_destroy(streambuf);
+  ret = c11_stream_file_destroy(stream);
   if (ret < 0) return 1;
   return 0;
 }

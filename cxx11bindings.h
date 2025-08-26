@@ -74,58 +74,6 @@ CXX11_BINDINGS_EXPORT int c11_stream_flush(struct c11_stream* c11_stream);
 CXX11_BINDINGS_EXPORT stream_length
 c11_stream_trunc(struct c11_stream* c11_stream, stream_length size);
 
-#if 0
-#define MIN(a, b) ((a) < (b) ? (a) : (b))
-
-static inline buf_size c11_streambuf_read(struct c11_streambuf* c11_streambuf,
-                                          byte* buffer, const buf_size count) {
-  // user asks us to read 'count' bytes into 'buffer'
-  struct managed_buffer* managed_buffer = &c11_streambuf->buffer;
-  assert(managed_buffer->size != 0);
-  // do it in chunk of buffer size:
-  buf_size total_read = 0;
-  while (total_read < count) {
-    const buf_size to_read =
-        MIN(count - total_read, (buf_size)(managed_buffer->size));
-    assert(to_read > 0);
-    const buf_size ret = managed_buffer->buf_read(to_read);
-    // do not check ret == 0 here
-    if (ret < 0) {
-      return ret; // handle error
-    }
-    memcpy(buffer + total_read, managed_buffer->data, ret);
-    total_read += ret;
-    // add an extra 'if' to skip next potential expensive 'buf_read' callback
-    if (ret < to_read) {
-      return total_read; // end of stream
-    }
-  }
-  return total_read;
-}
-
-static inline buf_size c11_streambuf_write(struct c11_streambuf* c11_streambuf,
-                                           const byte* buffer,
-                                           const buf_size count) {
-  struct managed_buffer* managed_buffer = &c11_streambuf->buffer;
-  // do it in chunk of buffer size:
-  buf_size total_write = 0;
-  while (total_write < count) {
-    const buf_size to_write =
-        MIN(count - total_write, (buf_size)(managed_buffer->size));
-    assert(to_write > 0);
-    memcpy(managed_buffer->data, buffer + total_write, to_write);
-    const buf_size ret = managed_buffer->buf_write(to_write);
-    assert(ret != 0);
-    if (ret < 0) {
-      return ret; // handle error
-    }
-    total_write += ret;
-  }
-  return total_write;
-}
-#undef MIN
-#endif
-
 #ifdef __cplusplus
 }  // end extern "C"
 #endif
