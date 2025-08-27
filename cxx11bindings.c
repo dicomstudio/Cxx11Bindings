@@ -4,8 +4,8 @@
 #include <corerror.h>
 #include <winerror.h>
 #else
-#define E_POINTER 0x80004003
-#define COR_E_NOTSUPPORTED 0x80131515
+#define E_POINTER (int)0x80004003
+#define COR_E_NOTSUPPORTED (int)0x80131515
 #endif
 
 buf_size c11_stream_read(struct c11_stream* c11_stream, byte* buffer,
