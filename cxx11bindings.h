@@ -13,14 +13,9 @@
 #define CXX11_CHECK_RETURN
 #endif
 
-// https://learn.microsoft.com/en-us/dotnet/framework/interop/how-to-map-hresults-and-exceptions
-#define C11B_E_POINTER ((int)0x80004003)
-#define C11B_E_NOTSUPPORTED ((int)0x80131515)
-// NotImplementedException
-#define C11B_E_NOTIMPL ((int)0x80004001)
-
 #ifdef __cplusplus
 extern "C" {
+
 #endif
 
 // C ABI to be used from C# P/Invoke or Python.ctypes
@@ -44,6 +39,19 @@ enum seek_dirs {
   seek_beg = 0,
   seek_cur = 1,
   seek_end = 2,
+};
+
+// Define our internal error codes to be used as return values
+// they must be decoded at library level to be remap to foreign library
+// exception terminology is inspired from .net HRESULT:
+// https://learn.microsoft.com/en-us/dotnet/framework/interop/how-to-map-hresults-and-exceptions
+enum error_codes {
+  // NullReferenceException
+  C11_E_POINTER = (int)0x80000000,
+  // NotSupportedException
+  C11_E_NOTSUPPORTED,
+  // NotImplementedException
+  C11_E_NOTIMPL
 };
 
 // 'c11' is the namespace, 'stream' is the type:
