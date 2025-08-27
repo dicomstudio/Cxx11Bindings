@@ -4,7 +4,8 @@
 #include "cxx11bindings.h"
 #include "cxx11exceptions.hxx"
 
-#include <cstring>  // memmove
+#include <algorithm>  // std::min
+#include <cstring>    // memmove
 #include <vector>
 
 namespace cxx11 {
@@ -79,6 +80,7 @@ class c_stream final : public stream_interface {
   }
 };
 
+// basic default streambuf implementation using c11_stream
 class basic_streambuf final : public std::streambuf {
  public:
   explicit basic_streambuf(stream_interface* f,
@@ -100,7 +102,7 @@ class basic_streambuf final : public std::streambuf {
 
     // putback space
     std::size_t putback = gptr() - eback();
-    if (putback > put_back_size) putback = put_back_size;
+    putback = std::min(putback, put_back_size);
 
     std::memmove(buffer_.data() + (put_back_size - putback), gptr() - putback,
                  putback);
@@ -143,11 +145,11 @@ class basic_streambuf final : public std::streambuf {
   // Seeking
   pos_type seekoff(off_type off, const std::ios_base::seekdir way,
                    const std::ios_base::openmode which) override {
-    if (!stream_) return pos_type(-1);
+    if (!stream_) return {-1};
 
     // Flush output buffer before seeking
     if (which & std::ios_base::out) {
-      if (sync() == -1) return pos_type(-1);
+      if (sync() == -1) return {-1};
     }
 
     // Calculate origin
@@ -163,7 +165,7 @@ class basic_streambuf final : public std::streambuf {
         origin = seek_dirs::seek_end;
         break;
       default:
-        return pos_type(-1);
+        return {-1};
     }
 
     // If seeking relative to current in input mode, adjust by unread bytes
@@ -178,8 +180,8 @@ class basic_streambuf final : public std::streambuf {
          buffer_.data() + put_back_size);
     setp(buffer_.data(), buffer_.data() + buffer_.size());
 
-    if (pos < 0) return pos_type(-1);
-    return pos_type(pos);
+    if (pos < 0) return {-1};
+    return {pos};
   }
 
   pos_type seekpos(const pos_type sp,
