@@ -70,7 +70,9 @@ class cfile_stream final : public stream_interface {
     if (!stream_) {
       return static_cast<int>(CxxExceptionCode::NullPointer);
     }
+    assert(count>=0);
     const size_t ret = fread(buf, 1, count, stream_);
+    //assert(ret==static_cast<size_t>(count));
     return static_cast<buf_size>(ret);
   }
 
@@ -78,7 +80,9 @@ class cfile_stream final : public stream_interface {
     if (!stream_) {
       return static_cast<int>(CxxExceptionCode::NullPointer);
     }
+    assert(count>=0);
     const size_t ret = fwrite(buf, 1, count, stream_);
+    assert(ret==static_cast<size_t>(count));
     return static_cast<buf_size>(ret);
   }
 
@@ -98,9 +102,11 @@ class cfile_stream final : public stream_interface {
         whence = SEEK_END;
         break;
       default:
+        assert(0);
         return static_cast<stream_offset>(CxxExceptionCode::InvalidArgument);
     }
     const int ret = fseek_file_fp(stream_, off, whence);
+    assert(ret!=-1);
     return ret == -1 ? -1 : ftell_file_fp(stream_);
   }
 
