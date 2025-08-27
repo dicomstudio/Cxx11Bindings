@@ -260,7 +260,7 @@ TEST(DefaultStreamBuf, WriteReadSeekFlush6) {
     error_streambuf impl;
     cxx11::stream_streambuf adapter(&impl);
     // default_streambuf rdbuf(&adapter);
-    cxx11::nobuffer_streambuf rdbuf(&adapter);
+    cxx11::buffered_streambuf rdbuf(&adapter, 1);
 
     EXPECT_TRUE(rdbuf.sbumpc() == std::streambuf::traits_type::eof());
     // EXPECT_TRUE(rdbuf.sputc(' ') == std::streambuf::traits_type::eof());

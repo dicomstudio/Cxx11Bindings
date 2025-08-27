@@ -4,8 +4,8 @@
 #include "cxx11bindings.h"
 #include "cxx11exceptions.hxx"
 
+#include <cstring>  // memmove
 #include <vector>
-#include <cstring> // memmove
 
 namespace cxx11 {
 class stream_interface {
@@ -206,420 +206,122 @@ class external_streambuf final : public std::streambuf {
   }
 };
 
-class file_streambuf_debug : public std::streambuf {
-public:
-    explicit file_streambuf_debug(FILE* f, std::size_t buff_sz = 4096)
-        : file(f), buffer(buff_sz + put_back_size) {
-        char* base = buffer.data();
-        setg(base + put_back_size, base + put_back_size, base + put_back_size);
-        setp(base, base + buffer.size());
-    }
-
-    ~file_streambuf_debug() override {
-        sync(); // flush pending output
-    }
-
-protected:
-    // Input
-    int_type underflow() override {
-        if (!file) return traits_type::eof();
-
-        // putback space
-        std::size_t putback = gptr() - eback();
-        if (putback > put_back_size)
-            putback = put_back_size;
-
-        std::memmove(buffer.data() + (put_back_size - putback),
-                     gptr() - putback, putback);
-
-        std::size_t n = std::fread(buffer.data() + put_back_size, 1,
-                                   buffer.size() - put_back_size, file);
-        if (n == 0) return traits_type::eof();
-
-        setg(buffer.data() + (put_back_size - putback),
-             buffer.data() + put_back_size,
-             buffer.data() + put_back_size + n);
-
-        return traits_type::to_int_type(*gptr());
-    }
-
-    // Output
-    int_type overflow(int_type ch) override {
-        if (!file) return traits_type::eof();
-
-        if (pptr() != pbase()) {
-            if (flush_buffer() == EOF)
-                return traits_type::eof();
-        }
-
-        if (!traits_type::eq_int_type(ch, traits_type::eof())) {
-            *pptr() = traits_type::to_char_type(ch);
-            pbump(1);
-        }
-
-        return traits_type::not_eof(ch);
-    }
-
-    int sync() override {
-        return (flush_buffer() == EOF) ? -1 : 0;
-    }
-
-    // Seeking
-    pos_type seekoff(off_type off, std::ios_base::seekdir way,
-                     std::ios_base::openmode which) override {
-        if (!file) return pos_type(off_type(-1));
-
-        // Flush output buffer before seeking
-        if (which & std::ios_base::out) {
-            if (sync() == -1) return pos_type(off_type(-1));
-        }
-
-        // Calculate origin
-        int origin;
-        switch (way) {
-            case std::ios_base::beg: origin = SEEK_SET; break;
-            case std::ios_base::cur: origin = SEEK_CUR; break;
-            case std::ios_base::end: origin = SEEK_END; break;
-            default: return pos_type(off_type(-1));
-        }
-
-        // If seeking relative to current in input mode, adjust by unread bytes
-        if ((which & std::ios_base::in) && way == std::ios_base::cur) {
-            off -= (egptr() - gptr());
-        }
-
-        if (std::fseek(file, off, origin) != 0)
-            return pos_type(off_type(-1));
-
-        // Invalidate buffer after seek
-        setg(buffer.data() + put_back_size,
-             buffer.data() + put_back_size,
-             buffer.data() + put_back_size);
-        setp(buffer.data(), buffer.data() + buffer.size());
-
-        long pos = std::ftell(file);
-        if (pos < 0) return pos_type(off_type(-1));
-        return pos_type(pos);
-    }
-
-    pos_type seekpos(pos_type sp, std::ios_base::openmode which) override {
-        return seekoff(off_type(sp), std::ios_base::beg, which);
-    }
-
-private:
-    static constexpr std::size_t put_back_size = 8;
-    FILE* file;
-    std::vector<char> buffer;
-
-    int flush_buffer() {
-        std::ptrdiff_t n = pptr() - pbase();
-        if (n > 0) {
-            if (std::fwrite(pbase(), 1, n, file) != static_cast<size_t>(n))
-                return EOF;
-            pbump(static_cast<int>(-n));
-        }
-        return 0;
-    }
-};
-class file_streambuf_debug2 : public std::streambuf {
-public:
-    explicit file_streambuf_debug2(stream_interface * f, std::size_t buff_sz = 4096)
-        : file(f), buffer(buff_sz + put_back_size) {
-        char* base = buffer.data();
-        setg(base + put_back_size, base + put_back_size, base + put_back_size);
-        setp(base, base + buffer.size());
-    }
-
-    ~file_streambuf_debug2() override {
-        sync(); // flush pending output
-    }
-
-protected:
-    // Input
-    int_type underflow() override {
-        if (!file) return traits_type::eof();
-
-        // putback space
-        std::size_t putback = gptr() - eback();
-        if (putback > put_back_size)
-            putback = put_back_size;
-
-        std::memmove(buffer.data() + (put_back_size - putback),
-                     gptr() - putback, putback);
-
-#if 0
-        std::size_t n = std::fread(buffer.data() + put_back_size, 1,
-                                   buffer.size() - put_back_size, file);
-#else
-      std::size_t n = file->read(reinterpret_cast<byte*>(buffer.data() + put_back_size),
-                           static_cast<buf_size>(buffer.size() - put_back_size) );
-#endif
-        if (n == 0) return traits_type::eof();
-
-        setg(buffer.data() + (put_back_size - putback),
-             buffer.data() + put_back_size,
-             buffer.data() + put_back_size + n);
-
-        return traits_type::to_int_type(*gptr());
-    }
-
-    // Output
-    int_type overflow(int_type ch) override {
-        if (!file) return traits_type::eof();
-
-        if (pptr() != pbase()) {
-            if (flush_buffer() == EOF)
-                return traits_type::eof();
-        }
-
-        if (!traits_type::eq_int_type(ch, traits_type::eof())) {
-            *pptr() = traits_type::to_char_type(ch);
-            pbump(1);
-        }
-
-        return traits_type::not_eof(ch);
-    }
-
-    int sync() override {
-        return (flush_buffer() == EOF) ? -1 : 0;
-    }
-
-    // Seeking
-    pos_type seekoff(off_type off, std::ios_base::seekdir way,
-                     std::ios_base::openmode which) override {
-        if (!file) return pos_type(off_type(-1));
-
-        // Flush output buffer before seeking
-        if (which & std::ios_base::out) {
-            if (sync() == -1) return pos_type(off_type(-1));
-        }
-
-        // Calculate origin
-        seek_dir origin;
-        switch (way) {
-            case std::ios_base::beg: origin = seek_dirs::seek_beg; break;
-            case std::ios_base::cur: origin = seek_dirs::seek_cur; break;
-            case std::ios_base::end: origin = seek_dirs::seek_end; break;
-            default: return pos_type(off_type(-1));
-        }
-
-        // If seeking relative to current in input mode, adjust by unread bytes
-        if ((which & std::ios_base::in) && way == std::ios_base::cur) {
-            off -= (egptr() - gptr());
-        }
-
-#if 0
-        if (std::fseek(file, off, origin) != 0)
-            return pos_type(off_type(-1));
-#else
-      stream_offset pos = file->seek(off, origin);
-      if ( pos < 0)
-            return pos_type(off_type(-1));
-#endif
-
-        // Invalidate buffer after seek
-        setg(buffer.data() + put_back_size,
-             buffer.data() + put_back_size,
-             buffer.data() + put_back_size);
-        setp(buffer.data(), buffer.data() + buffer.size());
-
-        //long pos = std::ftell(file);
-        if (pos < 0) return pos_type(off_type(-1));
-        return pos_type(pos);
-    }
-
-    pos_type seekpos(pos_type sp, std::ios_base::openmode which) override {
-        return seekoff(off_type(sp), std::ios_base::beg, which);
-    }
-
-private:
-    static constexpr std::size_t put_back_size = 8;
-    stream_interface* file;
-    std::vector<char> buffer;
-
-    int flush_buffer() {
-        std::ptrdiff_t n = pptr() - pbase();
-        if (n > 0) {
-#if 0
-            if (std::fwrite(pbase(), 1, n, file) != static_cast<size_t>(n))
-                return EOF;
-#else
-          const buf_size  ret = file->write(reinterpret_cast<const byte*>(pbase()), static_cast<buf_size>(n));
-          if ( ret != static_cast<buf_size>(n))
-                return EOF;
-#endif
-            pbump(static_cast<int>(-n));
-        }
-        return 0;
-    }
-};
-
 class buffered_streambuf final : public std::streambuf {
-  stream_interface* stream_;
-  std::vector<char> buffer_;
-
  public:
-  explicit buffered_streambuf(stream_interface* s,
-                              const std::size_t buffer_size = 4096)
-      : stream_(s), buffer_(buffer_size) {
-    if (!stream_) {
-      throw std::invalid_argument("file pointer is null");
-    }
-    setg(buffer_.data(), buffer_.data() + buffer_.size(),
-         buffer_.data() + buffer_.size());
-    setp(buffer_.data(), buffer_.data() + buffer_.size());
+  explicit buffered_streambuf(stream_interface* f, std::size_t buff_sz = 4096)
+      : file(f), buffer(buff_sz + put_back_size) {
+    char* base = buffer.data();
+    setg(base + put_back_size, base + put_back_size, base + put_back_size);
+    setp(base, base + buffer.size());
   }
 
-  ~buffered_streambuf() override { sync(); }
+  ~buffered_streambuf() override {
+    sync();  // flush pending output
+  }
 
  protected:
   // Input
   int_type underflow() override {
-    if (gptr() < egptr()) {
-      return traits_type::to_int_type(*gptr());
-    }
-    const int n = stream_->read(reinterpret_cast<byte*>(buffer_.data()),
-                                static_cast<buf_size>(buffer_.size()));
-    if (n < 0) {
-      assert(0);
-    }
-    if (n == 0) {
-      return traits_type::eof();
-    }
-    setg(buffer_.data(), buffer_.data(), buffer_.data() + n);
+    if (!file) return traits_type::eof();
+
+    // putback space
+    std::size_t putback = gptr() - eback();
+    if (putback > put_back_size) putback = put_back_size;
+
+    std::memmove(buffer.data() + (put_back_size - putback), gptr() - putback,
+                 putback);
+
+    std::size_t n =
+        file->read(reinterpret_cast<byte*>(buffer.data() + put_back_size),
+                   static_cast<buf_size>(buffer.size() - put_back_size));
+    if (n == 0) return traits_type::eof();
+
+    setg(buffer.data() + (put_back_size - putback),
+         buffer.data() + put_back_size, buffer.data() + put_back_size + n);
+
     return traits_type::to_int_type(*gptr());
   }
 
   // Output
-  int_type overflow(const int_type ch = traits_type::eof()) override {
-    if (pptr() > pbase()) {
-      const buf_size n = static_cast<buf_size>(pptr() - pbase());
-      const int ret = stream_->write(reinterpret_cast<const byte*>(pbase()), n);
-      if (ret < 0) {
-        assert(0);
-      }
-      if (ret != static_cast<int>(n)) {
-        return traits_type::eof();
-      }
+  int_type overflow(int_type ch) override {
+    if (!file) return traits_type::eof();
+
+    if (pptr() != pbase()) {
+      if (flush_buffer() == EOF) return traits_type::eof();
     }
-    setp(buffer_.data(), buffer_.data() + buffer_.size());
+
     if (!traits_type::eq_int_type(ch, traits_type::eof())) {
       *pptr() = traits_type::to_char_type(ch);
       pbump(1);
     }
+
     return traits_type::not_eof(ch);
   }
 
-  int sync() override {
-    if (overflow() == traits_type::eof()) {
-      return -1;
-    }
-    return stream_->flush() == 0 ? 0 : -1;
-  }
+  int sync() override { return (flush_buffer() == EOF) ? -1 : 0; }
 
-  std::streampos seekoff(const std::streamoff off,
-                         const std::ios_base::seekdir dir,
-                         const std::ios_base::openmode which) override {
-    // if (!stream_ || !stream_->seek) return -1;
-    seek_dir cdir;
-    if (dir == std::ios_base::beg) {
-      cdir = seek_beg;
-    } else if (dir == std::ios_base::cur) {
-      cdir = seek_cur;
-    } else if (dir == std::ios_base::end) {
-      cdir = seek_end;
-    } else {
-      return {-1};
-    }
+  // Seeking
+  pos_type seekoff(off_type off, std::ios_base::seekdir way,
+                   std::ios_base::openmode which) override {
+    if (!file) return pos_type(off_type(-1));
 
-    // Only flush if seeking in output mode
+    // Flush output buffer before seeking
     if (which & std::ios_base::out) {
-      if (stream_->flush() != 0) {
-        return -1;
-      }
+      if (sync() == -1) return pos_type(off_type(-1));
     }
-    const stream_offset pos = stream_->seek(off, cdir);
-    return pos < 0 ? -1 : pos;
+
+    // Calculate origin
+    seek_dir origin;
+    switch (way) {
+      case std::ios_base::beg:
+        origin = seek_dirs::seek_beg;
+        break;
+      case std::ios_base::cur:
+        origin = seek_dirs::seek_cur;
+        break;
+      case std::ios_base::end:
+        origin = seek_dirs::seek_end;
+        break;
+      default:
+        return pos_type(off_type(-1));
+    }
+
+    // If seeking relative to current in input mode, adjust by unread bytes
+    if ((which & std::ios_base::in) && way == std::ios_base::cur) {
+      off -= (egptr() - gptr());
+    }
+
+    stream_offset pos = file->seek(off, origin);
+    if (pos < 0) return pos_type(off_type(-1));
+
+    // Invalidate buffer after seek
+    setg(buffer.data() + put_back_size, buffer.data() + put_back_size,
+         buffer.data() + put_back_size);
+    setp(buffer.data(), buffer.data() + buffer.size());
+
+    // long pos = std::ftell(file);
+    if (pos < 0) return pos_type(off_type(-1));
+    return pos_type(pos);
   }
 
-  std::streampos seekpos(const std::streampos sp,
-                         const std::ios_base::openmode which) override {
-    return seekoff(sp, std::ios_base::beg, which);
-  }
-};
-
-class nobuffer_streambuf : public std::streambuf {
-  stream_interface* stream_;
-  char last_char_;
-
- public:
-  explicit nobuffer_streambuf(stream_interface* file) : stream_(file) {
-    if (!stream_) {
-      throw std::invalid_argument("file pointer is null");
-    }
-    setg(nullptr, nullptr, nullptr);
-    setp(nullptr, nullptr);
+  pos_type seekpos(pos_type sp, std::ios_base::openmode which) override {
+    return seekoff(off_type(sp), std::ios_base::beg, which);
   }
 
- protected:
-  int_type underflow() override {
-    char c;
-    const int n = stream_->read(reinterpret_cast<byte*>(&c), 1);
-    if (n < 0) {
-      assert(0);
-    }
-    if (n == 0) {
-      return traits_type::eof();
-    }
-    // Store the character in a static buffer for gptr/egptr contract
-    last_char_ = c;
-    setg(&last_char_, &last_char_, &last_char_ + 1);
-    return traits_type::to_int_type(c);
-  }
+ private:
+  static constexpr std::size_t put_back_size = 8;
+  stream_interface* file;
+  std::vector<char> buffer;
 
-  int_type overflow(const int_type ch = traits_type::eof()) override {
-    if (traits_type::eq_int_type(ch, traits_type::eof())) {
-      return traits_type::not_eof(ch);
+  int flush_buffer() {
+    std::ptrdiff_t n = pptr() - pbase();
+    if (n > 0) {
+      const buf_size ret = file->write(reinterpret_cast<const byte*>(pbase()),
+                                       static_cast<buf_size>(n));
+      if (ret != static_cast<buf_size>(n)) return EOF;
+      pbump(static_cast<int>(-n));
     }
-    char c = traits_type::to_char_type(ch);
-    const int ret = stream_->write(reinterpret_cast<const byte*>(&c), 1);
-    if (ret < 0) {
-      assert(0);
-    }
-    if (ret != 1) {
-      return traits_type::eof();
-    }
-    return ch;
-  }
-
-  int sync() override { return stream_->flush() == 0 ? 0 : -1; }
-
-  pos_type seekoff(const off_type off, const std::ios_base::seekdir dir,
-                   const std::ios_base::openmode which) override {
-    seek_dir cdir;
-    if (dir == std::ios_base::beg) {
-      cdir = seek_beg;
-    } else if (dir == std::ios_base::cur) {
-      cdir = seek_cur;
-    } else if (dir == std::ios_base::end) {
-      cdir = seek_end;
-    } else {
-      return {-1};
-    }
-
-    // Only flush if seeking in output mode
-    if (which & std::ios_base::out) {
-      if (stream_->flush() != 0) {
-        return {-1};
-      }
-    }
-    const stream_offset pos = stream_->seek(off, cdir);
-    return pos < 0 ? -1 : pos;
-  }
-
-  pos_type seekpos(const pos_type pos,
-                   const std::ios_base::openmode which) override {
-    return seekoff(pos, std::ios_base::beg, which);
+    return 0;
   }
 };
 }  // namespace cxx11
