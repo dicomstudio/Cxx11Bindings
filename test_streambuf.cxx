@@ -2,6 +2,7 @@
 
 #include <fstream>  // std::filebuf
 #include <gtest/gtest.h>
+#include <sstream>
 
 TEST(FileBufComparison, WriteAndRead) {
   auto filename = "testfile.txt";
@@ -15,7 +16,7 @@ TEST(FileBufComparison, WriteAndRead) {
     fb.close();
   }
 
-  // Read using your filebuf_nobuffer
+  // Read using our buffered_streambuf
   std::string custom_read(data.size(), '\0');
   {
     std::filebuf impl;
@@ -36,11 +37,9 @@ TEST(FileBufComparison, WriteAndRead) {
     fb.close();
   }
 
-  EXPECT_EQ(custom_read, std_read);
-  EXPECT_EQ(std_read, data);
+  EXPECT_EQ(data, custom_read);
+  EXPECT_EQ(data, std_read);
 }
-
-#include <sstream>
 
 TEST(DefaultStreamBuf, WriteReadSeekFlush) {
   auto filename = "default_streambuf_api_test.txt";
@@ -55,7 +54,7 @@ TEST(DefaultStreamBuf, WriteReadSeekFlush) {
     os.flush();
   }
 
-  // Read using default_streambuf
+  // Read using buffered_streambuf
   std::string read_data(data.size(), '\0');
   {
     std::filebuf fb;
@@ -95,7 +94,7 @@ TEST(DefaultStreamBuf, WriteReadSeekFlush2) {
     fb.open(filename, std::ios::out);
     auto size = fb.sputn(data.data(), data.size());
     EXPECT_EQ(0, size);
-    const int err = fb.pubsync();  // flushes the buffer to the file
+    const int err = fb.pubsync(); // flushes the buffer to the file
     EXPECT_EQ(0, err);
     const auto ret = fb.close();
     EXPECT_EQ(nullptr, ret);
@@ -107,7 +106,7 @@ TEST(DefaultStreamBuf, WriteReadSeekFlush2) {
     cxx11::buffered_streambuf fb(&adapter);
     auto size = fb.sputn(data.data(), data.size());
     EXPECT_EQ(0, size);
-    const int err = fb.pubsync();  // flushes the buffer to the file
+    const int err = fb.pubsync(); // flushes the buffer to the file
     EXPECT_EQ(0, err);
     // no exception
   }
@@ -223,9 +222,11 @@ TEST(DefaultStreamBuf, WriteReadSeekFlush5) {
 class error_streambuf : public std::streambuf {
  protected:
   int_type underflow() override { return traits_type::eof(); }
+
   int_type overflow(int_type = traits_type::eof()) override {
     return traits_type::eof();
   }
+
   int sync() override { return -1; }
 #if 0
   pos_type seekoff(off_type, std::ios_base::seekdir,
@@ -269,7 +270,7 @@ TEST(DefaultStreamBuf, WriteReadSeekFlush6) {
       rdbuf.sputc(' ');
       oss << &rdbuf;
       auto str = oss.str();
-      EXPECT_TRUE(str.size() == 0);
+      EXPECT_TRUE(str.empty());
     }
     EXPECT_TRUE(rdbuf.pubsync() == -1);
 
