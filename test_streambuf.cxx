@@ -22,7 +22,7 @@ TEST(FileBufComparison, WriteAndRead) {
     std::filebuf impl;
     impl.open(filename, std::ios::in);
     cxx11::stream_streambuf adapter(&impl);
-    cxx11::buffered_streambuf fb(&adapter);
+    cxx11::basic_streambuf fb(&adapter);
     std::istream is(&fb);
     is.read(&custom_read[0], data.size());
   }
@@ -60,7 +60,7 @@ TEST(DefaultStreamBuf, WriteReadSeekFlush) {
     std::filebuf fb;
     fb.open(filename, std::ios::in);
     cxx11::stream_streambuf adapter(&fb);
-    cxx11::buffered_streambuf buf(&adapter);
+    cxx11::basic_streambuf buf(&adapter);
     std::istream is(&buf);
 
     // Test seekg/seekoff/seekpos
@@ -103,7 +103,7 @@ TEST(DefaultStreamBuf, WriteReadSeekFlush2) {
     std::filebuf impl;
     impl.open(filename, std::ios::out);
     cxx11::stream_streambuf adapter(&impl);
-    cxx11::buffered_streambuf fb(&adapter);
+    cxx11::basic_streambuf fb(&adapter);
     auto size = fb.sputn(data.data(), data.size());
     EXPECT_EQ(0, size);
     const int err = fb.pubsync(); // flushes the buffer to the file
@@ -130,7 +130,7 @@ TEST(DefaultStreamBuf, WriteReadSeekFlush3) {
     std::filebuf impl;
     impl.open(filename, std::ios::in);
     cxx11::stream_streambuf adapter(&impl);
-    cxx11::buffered_streambuf fb(&adapter);
+    cxx11::basic_streambuf fb(&adapter);
     auto size = fb.sgetn(&data[0], data.size());
     EXPECT_EQ(0, size);
     // no exception
@@ -177,7 +177,7 @@ TEST(DefaultStreamBuf, WriteReadSeekFlush5) {
   {
     MyStreamBuf1 impl;
     cxx11::stream_streambuf adapter(&impl);
-    cxx11::buffered_streambuf rdbuf(&adapter);
+    cxx11::basic_streambuf rdbuf(&adapter);
     std::ostringstream oss;
     EXPECT_TRUE(oss.exceptions() == std::ios_base::goodbit);
 
@@ -205,7 +205,7 @@ TEST(DefaultStreamBuf, WriteReadSeekFlush5) {
   {
     MyStreamBuf2 impl;
     cxx11::stream_streambuf adapter(&impl);
-    cxx11::buffered_streambuf rdbuf(&adapter);
+    cxx11::basic_streambuf rdbuf(&adapter);
     std::ostringstream oss;
     EXPECT_TRUE(oss.exceptions() == std::ios_base::goodbit);
 
@@ -260,7 +260,7 @@ TEST(DefaultStreamBuf, WriteReadSeekFlush6) {
     error_streambuf impl;
     cxx11::stream_streambuf adapter(&impl);
     // default_streambuf rdbuf(&adapter);
-    cxx11::buffered_streambuf rdbuf(&adapter, 1);
+    cxx11::basic_streambuf rdbuf(&adapter, 1);
 
     EXPECT_TRUE(rdbuf.sbumpc() == std::streambuf::traits_type::eof());
     // EXPECT_TRUE(rdbuf.sputc(' ') == std::streambuf::traits_type::eof());

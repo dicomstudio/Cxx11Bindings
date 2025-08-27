@@ -2,7 +2,7 @@
 #define CXX11BINDINGS_H
 
 #include <stddef.h>  // size_t
-#include <stdint.h> // require c99
+#include <stdint.h>  // require c99
 
 #ifdef __GNUC__
 #define CXX11_BINDINGS_EXPORT __attribute__((visibility("default")))

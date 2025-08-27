@@ -79,17 +79,17 @@ class c_stream final : public stream_interface {
   }
 };
 
-class buffered_streambuf final : public std::streambuf {
+class basic_streambuf final : public std::streambuf {
  public:
-  explicit buffered_streambuf(stream_interface* f,
-                              const std::size_t buff_sz = 4096)
+  explicit basic_streambuf(stream_interface* f,
+                           const std::size_t buff_sz = 4096)
       : stream_(f), buffer_(buff_sz + put_back_size) {
     char* base = buffer_.data();
     setg(base + put_back_size, base + put_back_size, base + put_back_size);
     setp(base, base + buffer_.size());
   }
 
-  ~buffered_streambuf() override {
+  ~basic_streambuf() override {
     sync();  // flush pending output
   }
 
