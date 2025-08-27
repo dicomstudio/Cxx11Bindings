@@ -2,8 +2,7 @@
 #define CXX11BINDINGS_H
 
 #include <stddef.h>  // size_t
-#include <stdint.h>
-#include <string.h>
+#include <stdint.h> // require c99
 
 #ifdef __GNUC__
 #define CXX11_BINDINGS_EXPORT __attribute__((visibility("default")))
@@ -14,10 +13,16 @@
 #define CXX11_CHECK_RETURN
 #endif
 
+// https://learn.microsoft.com/en-us/dotnet/framework/interop/how-to-map-hresults-and-exceptions
+#define C11B_E_POINTER ((int)0x80004003)
+#define C11B_E_NOTSUPPORTED ((int)0x80131515)
+// NotImplementedException
+#define C11B_E_NOTIMPL ((int)0x80004001)
+
 #ifdef __cplusplus
 extern "C" {
-
 #endif
+
 // C ABI to be used from C# P/Invoke or Python.ctypes
 // struct allocation must be done in the target type and not native type to
 // allow clear separation (no tight coupling)
@@ -44,6 +49,7 @@ enum seek_dirs {
 // 'c11' is the namespace, 'stream' is the type:
 struct c11_stream;
 // function declaration for stream interface
+// all return types are signed to allow error codes to be returned
 typedef buf_size (*read_fn)(byte* buffer, buf_size count);
 typedef buf_size (*write_fn)(const byte* buffer, buf_size count);
 typedef stream_offset (*seek_fn)(stream_offset off, seek_dir dir);
