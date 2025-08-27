@@ -28,6 +28,11 @@ set(${PLUGIN_NAME}_LIBRARY_INSTALL_DIR "${CMAKE_INSTALL_LIBDIR}")
 # Output directories for libraries
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 
+# documentation
+set(DOC_FILES README.md)
+source_group("Documentation" FILES ${DOC_FILES})
+add_custom_target(docs SOURCES ${DOC_FILES})
+
 # sources
 set(CXX11_ABI cxx11bindings.h)
 set(CXX11_API ${CXX11_ABI} cxx11bindings.hxx cxx11exceptions.hxx)
