@@ -142,7 +142,7 @@ static constexpr std::size_t put_back_size = 8;
 // basic default streambuf implementation using c11_stream
 class basic_streambuf final : public std::streambuf {
  public:
-  explicit basic_streambuf(stream_interface* f,
+  explicit basic_streambuf(stream_interface& f,
                            const std::size_t buff_sz = 4096)
       : stream_(f), buffer_(buff_sz + put_back_size) {
     char* base = buffer_.data();
@@ -157,8 +157,6 @@ class basic_streambuf final : public std::streambuf {
  protected:
   // Input
   int_type underflow() override {
-    if (!stream_) return traits_type::eof();
-
     // putback space
     std::size_t putback = gptr() - eback();
     putback = std::min(putback, put_back_size);
@@ -171,9 +169,11 @@ class basic_streambuf final : public std::streambuf {
     // https://stackoverflow.com/a/77704741/136285
     // https://github.com/microsoft/STL/issues/4322
     const buf_size n =
-        stream_->read(reinterpret_cast<byte*>(buffer_.data() + put_back_size),
-                      static_cast<buf_size>(buffer_.size() - put_back_size));
-    if (n == 0) return traits_type::eof();
+        stream_.read(reinterpret_cast<byte*>(buffer_.data() + put_back_size),
+                     static_cast<buf_size>(buffer_.size() - put_back_size));
+    if (n == 0) {
+      return traits_type::eof();
+    }
 
     setg(buffer_.data() + (put_back_size - putback),
          buffer_.data() + put_back_size, buffer_.data() + put_back_size + n);
@@ -183,10 +183,10 @@ class basic_streambuf final : public std::streambuf {
 
   // Output
   int_type overflow(const int_type ch) override {
-    if (!stream_) return traits_type::eof();
-
     if (pptr() != pbase()) {
-      if (flush_buffer() == traits_type::eof()) return traits_type::eof();
+      if (flush_buffer() == traits_type::eof()) {
+        return traits_type::eof();
+      }
     }
 
     if (!traits_type::eq_int_type(ch, traits_type::eof())) {
@@ -202,11 +202,11 @@ class basic_streambuf final : public std::streambuf {
   // Seeking
   pos_type seekoff(off_type off, const std::ios_base::seekdir way,
                    const std::ios_base::openmode which) override {
-    if (!stream_) return {-1};
-
     // Flush output buffer before seeking
     if (which & std::ios_base::out) {
-      if (sync() == -1) return {-1};
+      if (sync() == -1) {
+        return {-1};
+      }
     }
 
     // Calculate origin
@@ -230,14 +230,16 @@ class basic_streambuf final : public std::streambuf {
       off -= egptr() - gptr();
     }
 
-    const stream_offset pos = stream_->seek(off, origin);
+    const stream_offset pos = stream_.seek(off, origin);
 
     // Invalidate buffer after seek
     setg(buffer_.data() + put_back_size, buffer_.data() + put_back_size,
          buffer_.data() + put_back_size);
     setp(buffer_.data(), buffer_.data() + buffer_.size());
 
-    if (pos < 0) return {-1};
+    if (pos < 0) {
+      return {-1};
+    }
     return {pos};
   }
 
@@ -247,15 +249,17 @@ class basic_streambuf final : public std::streambuf {
   }
 
  private:
-  stream_interface* stream_;
+  stream_interface& stream_;
   std::vector<char> buffer_;
 
   int flush_buffer() {
     const std::ptrdiff_t n = pptr() - pbase();
     if (n > 0) {
-      const buf_size ret = stream_->write(
-          reinterpret_cast<const byte*>(pbase()), static_cast<buf_size>(n));
-      if (ret != static_cast<buf_size>(n)) return traits_type::eof();
+      const buf_size ret = stream_.write(reinterpret_cast<const byte*>(pbase()),
+                                         static_cast<buf_size>(n));
+      if (ret != static_cast<buf_size>(n)) {
+        return traits_type::eof();
+      }
       pbump(static_cast<int>(-n));
     }
     return 0;
