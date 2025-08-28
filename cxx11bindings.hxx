@@ -2,10 +2,13 @@
 #define CXX11_BINDINGS_HXX
 
 #include "cxx11bindings.h"
-#include "cxx11exceptions.hxx"
 
 #include <algorithm>  // std::min
-#include <cstring>    // memmove
+#include <cassert>
+#include <complex>
+#include <cstring>  // memmove
+#include <stdexcept>
+#include <streambuf>
 #include <vector>
 
 namespace cxx11 {
@@ -23,11 +26,69 @@ class stream_interface {
   virtual buf_size write(const byte* buf, buf_size count) = 0;
   virtual stream_offset seek(stream_offset off, seek_dir dir) = 0;
   virtual int flush() = 0;
-
-  virtual stream_length trunc(stream_length) {
-    return static_cast<int>(CxxExceptionCode::NotImplemented);
-  }
+  virtual stream_length trunc(stream_length) = 0;
 };
+
+// --- exceptions ---
+// Define an enum for C++ exception
+enum class ErrorCode : int {
+  NullPointer = C11_E_POINTER,
+  NotSupported = C11_E_NOTSUPPORTED,
+  NotImplemented = C11_E_NOTIMPL,
+  ArgumentException = C11_E_INVALIDARG,
+};
+
+// Custom exception class
+class null_pointer final : public std::exception {
+ public:
+  const char* what() const noexcept override {
+    return "Attempted to dereference a null pointer.";
+  }
+
+  null_pointer() = default;
+};
+
+class not_supported final : public std::runtime_error {
+ public:
+  explicit not_supported(const std::string& message = "Function not supported")
+      : std::runtime_error(message) {}
+};
+
+class not_implemented final : public std::logic_error {
+ public:
+  explicit not_implemented(
+      const std::string& message = "Function not yet implemented")
+      : std::logic_error(message) {}
+};
+
+class argument_exception final : public std::runtime_error {
+ public:
+  explicit argument_exception(const std::string& message = "Argument error")
+      : std::runtime_error(message) {}
+};
+
+[[noreturn]] static inline void throw_exception_from_enum(
+    const ErrorCode err_code) {
+  switch (err_code) {
+    case ErrorCode::NullPointer:
+      throw null_pointer();
+    case ErrorCode::NotSupported:
+      throw not_supported();
+    case ErrorCode::NotImplemented:
+      throw not_implemented();
+    case ErrorCode::ArgumentException:
+      throw argument_exception();
+  }
+  assert(0);
+}
+
+template <typename T>
+static inline void throw_exception_from_value(T value) {
+  // FIXME: check int32
+  if (value < 0) {
+    throw_exception_from_enum(static_cast<ErrorCode>(value));
+  }
+}
 
 class c_stream final : public stream_interface {
   c11_stream* c11_stream_;
@@ -45,43 +106,39 @@ class c_stream final : public stream_interface {
   ~c_stream() override = default;
 
   buf_size read(byte* buf, const buf_size count) override {
-    if (c11_stream_->read) {
-      return c11_stream_->read(buf, count);
-    }
-    return static_cast<buf_size>(CxxExceptionCode::NotImplemented);
+    const auto value = c11_stream_read(c11_stream_, buf, count);
+    throw_exception_from_value(value);
+    return value;
   }
 
   buf_size write(const byte* buf, const buf_size count) override {
-    if (c11_stream_->write) {
-      return c11_stream_->write(buf, count);
-    }
-    return static_cast<buf_size>(CxxExceptionCode::NotImplemented);
+    const auto value = c11_stream_write(c11_stream_, buf, count);
+    throw_exception_from_value(value);
+    return value;
   }
 
   stream_offset seek(const stream_offset off, const seek_dir dir) override {
-    if (c11_stream_->seek) {
-      return c11_stream_->seek(off, dir);
-    }
-    return static_cast<stream_offset>(CxxExceptionCode::NotImplemented);
+    const auto value = c11_stream_seek(c11_stream_, off, dir);
+    throw_exception_from_value(value);
+    return value;
   }
 
   int flush() override {
-    if (c11_stream_->flush) {
-      return c11_stream_->flush();
-    }
-    return static_cast<int>(CxxExceptionCode::NotImplemented);
+    const auto value = c11_stream_flush(c11_stream_);
+    throw_exception_from_value(value);
+    return value;
   }
 
   stream_length trunc(const stream_length size) override {
-    if (c11_stream_->trunc) {
-      return c11_stream_->trunc(size);
-    }
-    return static_cast<stream_length>(CxxExceptionCode::NotImplemented);
+    const auto value = c11_stream_trunc(c11_stream_, size);
+    throw_exception_from_value(value);
+    return value;
   }
 };
 
 // Outside class to cope with c++11 standard:
 static constexpr std::size_t put_back_size = 8;
+
 // basic default streambuf implementation using c11_stream
 class basic_streambuf final : public std::streambuf {
  public:
@@ -109,15 +166,13 @@ class basic_streambuf final : public std::streambuf {
     std::memmove(buffer_.data() + (put_back_size - putback), gptr() - putback,
                  putback);
 
+    // ->read() call may throw, but this is legitimate behavior:
+    // https://developercommunity.visualstudio.com/t/Exception-from-streambuf-should-be-caugh/10555755
+    // https://stackoverflow.com/a/77704741/136285
+    // https://github.com/microsoft/STL/issues/4322
     const buf_size n =
         stream_->read(reinterpret_cast<byte*>(buffer_.data() + put_back_size),
                       static_cast<buf_size>(buffer_.size() - put_back_size));
-    if (n < 0) {
-      // https://developercommunity.visualstudio.com/t/Exception-from-streambuf-should-be-caugh/10555755
-      // https://stackoverflow.com/a/77704741/136285
-      // https://github.com/microsoft/STL/issues/4322
-      throw std::ios_base::failure("stream read error.");
-    }
     if (n == 0) return traits_type::eof();
 
     setg(buffer_.data() + (put_back_size - putback),
@@ -200,9 +255,6 @@ class basic_streambuf final : public std::streambuf {
     if (n > 0) {
       const buf_size ret = stream_->write(
           reinterpret_cast<const byte*>(pbase()), static_cast<buf_size>(n));
-      if (ret < 0) {
-        throw std::ios_base::failure("flush_buffer write error.");
-      }
       if (ret != static_cast<buf_size>(n)) return traits_type::eof();
       pbump(static_cast<int>(-n));
     }

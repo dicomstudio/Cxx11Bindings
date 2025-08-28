@@ -1,4 +1,4 @@
-// Mostly for internal testing, it provide differnt stream_interface
+// Mostly for internal testing, it provides different stream_interface
 // implementation using standard API (FILE*, std::streambuf)
 #pragma once
 #include "cxx11bindings.hxx"
@@ -22,7 +22,7 @@ static inline int64_t truncate_file_fp(FILE* fp, int64_t new_size) {
   }
 
 #ifdef _WIN32
-  int fd = _fileno(fp);
+  const int fd = _fileno(fp);
   if (fd == -1) {
     return -1;
   }
@@ -31,7 +31,7 @@ static inline int64_t truncate_file_fp(FILE* fp, int64_t new_size) {
     return -1;
   }
 #else
-  int fd = fileno(fp);
+  const int fd = fileno(fp);
   if (fd == -1) {
     return -1;
   }
@@ -67,9 +67,6 @@ class cfile_stream final : public stream_interface {
   explicit cfile_stream(FILE* stream) : stream_(stream) {}
 
   buf_size read(byte* buf, const buf_size count) override {
-    if (!stream_) {
-      return static_cast<int>(CxxExceptionCode::NullPointer);
-    }
     assert(count >= 0);
     const size_t ret = fread(buf, 1, count, stream_);
     // assert(ret==static_cast<size_t>(count));
@@ -77,9 +74,6 @@ class cfile_stream final : public stream_interface {
   }
 
   buf_size write(const byte* buf, const buf_size count) override {
-    if (!stream_) {
-      return static_cast<int>(CxxExceptionCode::NullPointer);
-    }
     assert(count >= 0);
     const size_t ret = fwrite(buf, 1, count, stream_);
     assert(ret == static_cast<size_t>(count));
@@ -87,9 +81,6 @@ class cfile_stream final : public stream_interface {
   }
 
   stream_offset seek(const stream_offset off, const seek_dir dir) override {
-    if (!stream_) {
-      return static_cast<int>(CxxExceptionCode::NullPointer);
-    }
     int whence;
     switch (dir) {
       case seek_dirs::seek_beg:
@@ -102,8 +93,7 @@ class cfile_stream final : public stream_interface {
         whence = SEEK_END;
         break;
       default:
-        assert(0);
-        return static_cast<stream_offset>(CxxExceptionCode::InvalidArgument);
+        throw argument_exception("Invalid seek direction");
     }
     const int ret = fseek_file_fp(stream_, off, whence);
     assert(ret != -1);
@@ -111,9 +101,6 @@ class cfile_stream final : public stream_interface {
   }
 
   int flush() override {
-    if (!stream_) {
-      return static_cast<int>(CxxExceptionCode::NullPointer);
-    }
     const int ret = fflush(stream_);
     if (ret == 0) {
       return ret;
@@ -138,9 +125,6 @@ class stream_streambuf final : public stream_interface {
   explicit stream_streambuf(std::streambuf* stream) : stream_(stream) {}
 
   buf_size read(byte* buf, const buf_size count) override {
-    if (!stream_) {
-      return static_cast<int>(CxxExceptionCode::NullPointer);
-    }
     buf_size n = 0;
     for (; n < count; ++n) {
       const int c = stream_->sbumpc();
@@ -153,9 +137,6 @@ class stream_streambuf final : public stream_interface {
   }
 
   buf_size write(const byte* buf, const buf_size count) override {
-    if (!stream_) {
-      return static_cast<int>(CxxExceptionCode::NullPointer);
-    }
     buf_size n = 0;
     for (; n < count; ++n) {
       if (stream_->sputc(static_cast<char>(buf[n])) ==
@@ -167,9 +148,6 @@ class stream_streambuf final : public stream_interface {
   }
 
   stream_offset seek(const stream_offset off, const seek_dir dir) override {
-    if (!stream_) {
-      return static_cast<int>(CxxExceptionCode::NullPointer);
-    }
     std::ios_base::seekdir sd;
     switch (dir) {
       case seek_dirs::seek_beg:
@@ -189,12 +167,9 @@ class stream_streambuf final : public stream_interface {
     return pos == std::streampos(-1) ? -1 : static_cast<stream_offset>(pos);
   }
 
-  int flush() override {
-    if (!stream_) {
-      return static_cast<int>(CxxExceptionCode::NullPointer);
-    }
-    return stream_->pubsync();
-  }
+  int flush() override { return stream_->pubsync(); }
+
+  stream_length trunc(stream_length) override { throw not_supported(); }
 
  private:
   std::streambuf* stream_;
