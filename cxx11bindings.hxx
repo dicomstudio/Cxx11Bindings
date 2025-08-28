@@ -67,7 +67,7 @@ class argument_exception final : public std::runtime_error {
       : std::runtime_error(message) {}
 };
 
-[[noreturn]] static inline void throw_exception_from_enum(
+static inline void throw_exception_from_enum(
     const ErrorCode err_code) {
   switch (err_code) {
     case ErrorCode::NullPointer:
