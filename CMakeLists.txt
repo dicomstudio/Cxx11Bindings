@@ -53,7 +53,7 @@ add_library(${PLUGIN_NAME}_module MODULE cxx11bindings.c)
 target_link_libraries(${PLUGIN_NAME}_module ${PLUGIN_NAME})
 set_target_properties(
   ${PLUGIN_NAME}_module
-  PROPERTIES OUTPUT_NAME ${PLUGIN_NAME}
+  PROPERTIES OUTPUT_NAME ${PLUGIN_NAME}Tests
              PREFIX "" # Remove 'lib' prefix for MODULE on Unix
              LIBRARY_OUTPUT_DIRECTORY ${CMAKE_LIBRARY_OUTPUT_DIRECTORY}
              RUNTIME_OUTPUT_DIRECTORY ${CMAKE_LIBRARY_OUTPUT_DIRECTORY})
