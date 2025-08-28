@@ -93,7 +93,7 @@ class cfile_stream final : public stream_interface {
         whence = SEEK_END;
         break;
       default:
-        throw argument_exception("Invalid seek direction");
+        throw invalid_argument("Invalid seek direction");
     }
     const int ret = fseek_file_fp(stream_, off, whence);
     assert(ret != -1);

@@ -35,7 +35,7 @@ enum class ErrorCode : int {
   NullPointer = C11_E_POINTER,
   NotSupported = C11_E_NOTSUPPORTED,
   NotImplemented = C11_E_NOTIMPL,
-  ArgumentException = C11_E_INVALIDARG,
+  InvalidArgument = C11_E_INVALIDARG,
 };
 
 // Custom exception class
@@ -61,9 +61,9 @@ class not_implemented final : public std::logic_error {
       : std::logic_error(message) {}
 };
 
-class argument_exception final : public std::runtime_error {
+class invalid_argument final : public std::runtime_error {
  public:
-  explicit argument_exception(const std::string& message = "Argument error")
+  explicit invalid_argument(const std::string& message = "Argument error")
       : std::runtime_error(message) {}
 };
 
@@ -76,8 +76,8 @@ static inline void throw_exception_from_enum(
       throw not_supported();
     case ErrorCode::NotImplemented:
       throw not_implemented();
-    case ErrorCode::ArgumentException:
-      throw argument_exception();
+    case ErrorCode::InvalidArgument:
+      throw invalid_argument();
   }
   assert(0);
 }
