@@ -67,8 +67,6 @@
     <ClCompile Include="cxx11bindings.c" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="stream_interface_impl.hxx" />
-    <ClInclude Include="cxx11exceptions.hxx" />
     <ClInclude Include="cxx11bindings.hxx" />
     <ClInclude Include="cxx11bindings.h" />
   </ItemGroup>

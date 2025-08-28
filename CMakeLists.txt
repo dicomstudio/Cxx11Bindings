@@ -35,7 +35,7 @@ add_custom_target(docs SOURCES ${DOC_FILES})
 
 # sources
 set(CXX11_ABI cxx11bindings.h)
-set(CXX11_API ${CXX11_ABI} cxx11bindings.hxx cxx11exceptions.hxx)
+set(CXX11_API ${CXX11_ABI} cxx11bindings.hxx)
 set_source_files_properties(cxx11bindings.h PROPERTIES LANGUAGE C
                                                        HEADER_FILE_ONLY ON)
 

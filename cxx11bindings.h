@@ -50,7 +50,9 @@ enum error_codes {
   // NotSupportedException
   C11_E_NOTSUPPORTED,
   // NotImplementedException
-  C11_E_NOTIMPL
+  C11_E_NOTIMPL,
+  // ArgumentException
+  C11_E_INVALIDARG,
 };
 
 // 'c11' is the namespace, 'stream' is the type:
