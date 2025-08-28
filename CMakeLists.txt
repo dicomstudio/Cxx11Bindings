@@ -38,42 +38,25 @@ set(CXX11_ABI cxx11bindings.h)
 set(CXX11_API ${CXX11_ABI} cxx11bindings.hxx cxx11exceptions.hxx)
 set_source_files_properties(cxx11bindings.h PROPERTIES LANGUAGE C
                                                        HEADER_FILE_ONLY ON)
-set(SOURCES ${CXX11_API} cxx11bindings.c stream_interface_impl.hxx)
-# shared obj lib
-add_library(${PLUGIN_NAME}_obj OBJECT ${SOURCES})
-set_target_properties(${PLUGIN_NAME}_obj PROPERTIES POSITION_INDEPENDENT_CODE
-                                                    ON)
-if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
-  target_compile_definitions(${PLUGIN_NAME}_obj
-                             PRIVATE _GLIBCXX_USE_CXX11_ABI=1)
-endif()
-if(MSVC)
-  target_compile_definitions(${PLUGIN_NAME}_obj PRIVATE _CRT_SECURE_NO_WARNINGS)
-endif()
 
-# shared library
-add_library(${PLUGIN_NAME}_shared SHARED $<TARGET_OBJECTS:${PLUGIN_NAME}_obj>)
-set_target_properties(
-  ${PLUGIN_NAME}_shared
-  PROPERTIES OUTPUT_NAME ${PLUGIN_NAME}
-             ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_LIBRARY_OUTPUT_DIRECTORY}
-             LIBRARY_OUTPUT_DIRECTORY ${CMAKE_LIBRARY_OUTPUT_DIRECTORY}
-             RUNTIME_OUTPUT_DIRECTORY ${CMAKE_LIBRARY_OUTPUT_DIRECTORY})
+set(SOURCES ${CXX11_API} stream_interface_impl.hxx)
+add_library(${PLUGIN_NAME} INTERFACE ${SOURCES})
+
+# Specify include directories for consumers
+target_include_directories(${PLUGIN_NAME} INTERFACE
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
+    $<INSTALL_INTERFACE:include>
+)
 
 # module library (e.g., plugin for dlopen) ----
-add_library(${PLUGIN_NAME}_module MODULE $<TARGET_OBJECTS:${PLUGIN_NAME}_obj>)
+add_library(${PLUGIN_NAME}_module MODULE cxx11bindings.c)
+target_link_libraries(${PLUGIN_NAME}_module ${PLUGIN_NAME})
 set_target_properties(
   ${PLUGIN_NAME}_module
   PROPERTIES OUTPUT_NAME ${PLUGIN_NAME}
              PREFIX "" # Remove 'lib' prefix for MODULE on Unix
              LIBRARY_OUTPUT_DIRECTORY ${CMAKE_LIBRARY_OUTPUT_DIRECTORY}
              RUNTIME_OUTPUT_DIRECTORY ${CMAKE_LIBRARY_OUTPUT_DIRECTORY})
-
-install(
-  TARGETS ${PLUGIN_NAME}_shared ${PLUGIN_NAME}_module
-  RUNTIME DESTINATION bin
-  LIBRARY DESTINATION lib
-  ARCHIVE DESTINATION lib COMPONENT libraries)
 
 install(
   FILES ${CXX11_API}
@@ -95,7 +78,6 @@ if(BUILD_TESTING)
   target_compile_definitions(${PROJECT_NAME}_comp PUBLIC _FILE_OFFSET_BITS=64)
   target_compile_definitions(${PROJECT_NAME}_comp
                              PUBLIC _POSIX_C_SOURCE=200112L)
-  target_link_libraries(${PROJECT_NAME}_comp ${PLUGIN_NAME}_shared)
   # Define test executable
   find_package(GTest CONFIG REQUIRED)
   include(GoogleTest)
@@ -105,7 +87,6 @@ if(BUILD_TESTING)
                                PRIVATE _CRT_SECURE_NO_WARNINGS)
   endif()
   target_link_libraries(
-    ${PROJECT_NAME}_tests PRIVATE ${PLUGIN_NAME}_shared GTest::gtest_main
-                                  GTest::gtest)
+    ${PROJECT_NAME}_tests PRIVATE GTest::gtest_main GTest::gtest)
   gtest_discover_tests(${PROJECT_NAME}_tests)
 endif()

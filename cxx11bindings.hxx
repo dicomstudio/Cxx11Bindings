@@ -1,5 +1,5 @@
-#ifndef CXX11BINDINGS_HXX
-#define CXX11BINDINGS_HXX
+#ifndef CXX11_BINDINGS_HXX
+#define CXX11_BINDINGS_HXX
 
 #include "cxx11bindings.h"
 #include "cxx11exceptions.hxx"
@@ -211,4 +211,4 @@ class basic_streambuf final : public std::streambuf {
 };
 }  // namespace cxx11
 
-#endif  // CXX11BINDINGS_HXX
+#endif  // CXX11_BINDINGS_HXX

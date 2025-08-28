@@ -1,5 +1,5 @@
-#ifndef CXX11BINDINGS_H
-#define CXX11BINDINGS_H
+#ifndef CXX11_BINDINGS_H
+#define CXX11_BINDINGS_H
 
 #include <stddef.h>  // size_t
 #include <stdint.h>  // require c99
@@ -9,7 +9,6 @@
 #define CXX11_CHECK_RETURN __attribute__((__warn_unused_result__))
 #else
 #define CXX11_BINDINGS_EXPORT __declspec(dllexport)
-
 #define CXX11_CHECK_RETURN
 #endif
 
@@ -42,8 +41,8 @@ enum seek_dirs {
 };
 
 // Define our internal error codes to be used as return values
-// they must be decoded at library level to be remap to foreign library
-// exception terminology is inspired from .net HRESULT:
+// they must be decoded at library level to be remapped to foreign libraries.
+// Terminology is inspired from .net HRESULT:
 // https://learn.microsoft.com/en-us/dotnet/framework/interop/how-to-map-hresults-and-exceptions
 enum error_codes {
   // NullReferenceException
@@ -77,19 +76,56 @@ struct c11_stream {
 };
 
 /* c11 stream interface */
-CXX11_BINDINGS_EXPORT buf_size c11_stream_read(struct c11_stream* c11_stream,
-                                               byte* buffer, buf_size count);
-CXX11_BINDINGS_EXPORT buf_size c11_stream_write(struct c11_stream* c11_stream,
-                                                const byte* buffer,
-                                                buf_size count);
-CXX11_BINDINGS_EXPORT stream_offset
-c11_stream_seek(struct c11_stream* c11_stream, stream_offset off, seek_dir dir);
-CXX11_BINDINGS_EXPORT int c11_stream_flush(struct c11_stream* c11_stream);
-CXX11_BINDINGS_EXPORT stream_length
-c11_stream_trunc(struct c11_stream* c11_stream, stream_length size);
 
+#define CHECK_ARGS(s, e1, f, e2) \
+  do {                           \
+    if (!(s)) {                  \
+      return (e1);               \
+    }                            \
+    if (!((s)->f)) {             \
+      return (e2);               \
+    }                            \
+  } while (0)
+
+static inline buf_size c11_stream_read(struct c11_stream* c11_stream,
+                                       byte* buffer, const buf_size count) {
+  CHECK_ARGS(c11_stream, C11_E_POINTER, read, C11_E_NOTSUPPORTED);
+  // else
+  return c11_stream->read(buffer, count);
+}
+
+static inline buf_size c11_stream_write(struct c11_stream* c11_stream,
+                                        const byte* buffer,
+                                        const buf_size count) {
+  CHECK_ARGS(c11_stream, C11_E_POINTER, write, C11_E_NOTSUPPORTED);
+  // else
+  return c11_stream->write(buffer, count);
+}
+
+static inline stream_offset c11_stream_seek(struct c11_stream* c11_stream,
+                                            const stream_offset off,
+                                            const seek_dir dir) {
+  CHECK_ARGS(c11_stream, C11_E_POINTER, seek, C11_E_NOTSUPPORTED);
+  // else
+  return c11_stream->seek(off, dir);
+}
+
+static inline int c11_stream_flush(struct c11_stream* c11_stream) {
+  CHECK_ARGS(c11_stream, C11_E_POINTER, flush, C11_E_NOTSUPPORTED);
+  // else
+  return c11_stream->flush();
+}
+
+static inline stream_length c11_stream_trunc(struct c11_stream* c11_stream,
+                                             const stream_length size) {
+  CHECK_ARGS(c11_stream, C11_E_POINTER, trunc, C11_E_NOTSUPPORTED);
+  // else
+  return c11_stream->trunc(size);
+}
+
+#undef CHECK_ARGS
 #ifdef __cplusplus
 }  // end extern "C"
 #endif
 
-#endif  // CXX11BINDINGS_H
+#endif  // CXX11_BINDINGS_H
