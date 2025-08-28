@@ -80,6 +80,8 @@ class c_stream final : public stream_interface {
   }
 };
 
+// Outside class to cope with c++11 standard:
+static constexpr std::size_t put_back_size = 8;
 // basic default streambuf implementation using c11_stream
 class basic_streambuf final : public std::streambuf {
  public:
@@ -190,7 +192,6 @@ class basic_streambuf final : public std::streambuf {
   }
 
  private:
-  static constexpr std::size_t put_back_size = 8;
   stream_interface* stream_;
   std::vector<char> buffer_;
 
