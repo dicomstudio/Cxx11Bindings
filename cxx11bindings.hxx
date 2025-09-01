@@ -70,7 +70,7 @@ class invalid_argument final : public std::runtime_error {
 
 class io_exception final : public std::runtime_error {
  public:
-  explicit io_exception(const std::string& message = "Argument error")
+  explicit io_exception(const std::string& message = "io exception")
       : std::runtime_error(message) {}
 };
 
