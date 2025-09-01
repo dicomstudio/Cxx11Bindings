@@ -36,6 +36,7 @@ enum class ErrorCode : int {
   NotSupported = C11_E_NOTSUPPORTED,
   NotImplemented = C11_E_NOTIMPL,
   InvalidArgument = C11_E_INVALIDARG,
+  IOException = C11_E_IO
 };
 
 // Custom exception class
@@ -67,8 +68,13 @@ class invalid_argument final : public std::runtime_error {
       : std::runtime_error(message) {}
 };
 
-static inline void throw_exception_from_enum(
-    const ErrorCode err_code) {
+class io_exception final : public std::runtime_error {
+ public:
+  explicit io_exception(const std::string& message = "Argument error")
+      : std::runtime_error(message) {}
+};
+
+static inline void throw_exception_from_enum(const ErrorCode err_code) {
   switch (err_code) {
     case ErrorCode::NullPointer:
       throw null_pointer();
@@ -78,12 +84,14 @@ static inline void throw_exception_from_enum(
       throw not_implemented();
     case ErrorCode::InvalidArgument:
       throw invalid_argument();
+    case ErrorCode::IOException:
+      throw io_exception();
   }
   assert(0);
 }
 
 template <typename T>
-static inline void throw_exception_from_value(T value) {
+static inline void throw_exception_from_negative_value(T value) {
   // FIXME: check int32
   if (value < 0) {
     throw_exception_from_enum(static_cast<ErrorCode>(value));
@@ -107,31 +115,31 @@ class c_stream final : public stream_interface {
 
   buf_size read(byte* buf, const buf_size count) override {
     const auto value = c11_stream_read(c11_stream_, buf, count);
-    throw_exception_from_value(value);
+    throw_exception_from_negative_value(value);
     return value;
   }
 
   buf_size write(const byte* buf, const buf_size count) override {
     const auto value = c11_stream_write(c11_stream_, buf, count);
-    throw_exception_from_value(value);
+    throw_exception_from_negative_value(value);
     return value;
   }
 
   stream_offset seek(const stream_offset off, const seek_dir dir) override {
     const auto value = c11_stream_seek(c11_stream_, off, dir);
-    throw_exception_from_value(value);
+    throw_exception_from_negative_value(value);
     return value;
   }
 
   int flush() override {
     const auto value = c11_stream_flush(c11_stream_);
-    throw_exception_from_value(value);
+    throw_exception_from_negative_value(value);
     return value;
   }
 
   stream_length trunc(const stream_length size) override {
     const auto value = c11_stream_trunc(c11_stream_, size);
-    throw_exception_from_value(value);
+    throw_exception_from_negative_value(value);
     return value;
   }
 };

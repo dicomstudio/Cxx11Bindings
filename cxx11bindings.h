@@ -14,7 +14,6 @@
 
 #ifdef __cplusplus
 extern "C" {
-
 #endif
 
 // C ABI to be used from C# P/Invoke or Python.ctypes
@@ -53,6 +52,8 @@ enum error_codes {
   C11_E_NOTIMPL,
   // ArgumentException
   C11_E_INVALIDARG,
+  // IOException
+  C11_E_IO
 };
 
 // 'c11' is the namespace, 'stream' is the type:

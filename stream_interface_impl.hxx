@@ -2,117 +2,54 @@
 // implementation using standard API (FILE*, std::streambuf)
 #pragma once
 #include "cxx11bindings.hxx"
-#include <cassert>
+
+#include "stream_interface_impl.h"
 #include <ios>
 #include <streambuf>
 #include <string>
-
-#ifdef _WIN32
-#include <fcntl.h>
-#include <io.h>  // _chsize_s
-#else
-#include <unistd.h>  // ftruncate
-#endif
-
-// Truncate an open FILE* stream to a given size (in bytes).
-// Returns new size on success, -1 on error.
-static inline int64_t truncate_file_fp(FILE* fp, int64_t new_size) {
-  if (!fp || new_size < 0) {
-    return -1;
-  }
-
-#ifdef _WIN32
-  const int fd = _fileno(fp);
-  if (fd == -1) {
-    return -1;
-  }
-
-  if (_chsize_s(fd, new_size) != 0) {
-    return -1;
-  }
-#else
-  const int fd = fileno(fp);
-  if (fd == -1) {
-    return -1;
-  }
-
-  if (ftruncate(fd, new_size) != 0) {
-    return -1;
-  }
-#endif
-
-  return new_size;
-}
-
-static inline int fseek_file_fp(FILE* stream, int64_t offset, int whence) {
-#ifdef _WIN32
-  return _fseeki64(stream, offset, whence);
-#else
-  return fseeko(stream, offset, whence);
-#endif
-}
-
-static inline int64_t ftell_file_fp(FILE* stream) {
-#ifdef _WIN32
-  return _ftelli64(stream);
-#else
-  return ftello(stream);
-#endif
-}
 
 namespace cxx11 {
 // stream_interface implementation using FILE*
 class cfile_stream final : public stream_interface {
  public:
-  explicit cfile_stream(FILE* stream) : stream_(stream) {}
+  explicit cfile_stream(FILE* stream) : stream_(stream) {
+    if (!stream) {
+      throw null_pointer();
+    }
+  }
 
   buf_size read(byte* buf, const buf_size count) override {
-    assert(count >= 0);
-    const size_t ret = fread(buf, 1, count, stream_);
-    // assert(ret==static_cast<size_t>(count));
-    return static_cast<buf_size>(ret);
+    const buf_size ret = fread_file_fp(stream_, buf, count);
+    throw_exception_from_negative_value(ret);
+    // short-read ok:
+    return ret;
   }
 
   buf_size write(const byte* buf, const buf_size count) override {
-    assert(count >= 0);
-    const size_t ret = fwrite(buf, 1, count, stream_);
-    assert(ret == static_cast<size_t>(count));
-    return static_cast<buf_size>(ret);
+    const buf_size ret = fwrite_file_fp(stream_, buf, count);
+    throw_exception_from_negative_value(ret);
+    // non-negative:
+    return ret;
   }
 
   stream_offset seek(const stream_offset off, const seek_dir dir) override {
-    int whence;
-    switch (dir) {
-      case seek_dirs::seek_beg:
-        whence = SEEK_SET;
-        break;
-      case seek_dirs::seek_cur:
-        whence = SEEK_CUR;
-        break;
-      case seek_dirs::seek_end:
-        whence = SEEK_END;
-        break;
-      default:
-        throw invalid_argument("Invalid seek direction");
-    }
-    const int ret = fseek_file_fp(stream_, off, whence);
-    assert(ret != -1);
-    return ret == -1 ? -1 : ftell_file_fp(stream_);
+    const int ret32 = fseek_file_fp(stream_, off, dir);
+    throw_exception_from_negative_value(ret32);
+    const int64_t ret64 = ftell_file_fp(stream_);
+    throw_exception_from_negative_value(ret64);
+    return ret64;
   }
 
   int flush() override {
-    const int ret = fflush(stream_);
-    if (ret == 0) {
-      return ret;
-    }
-    // Otherwise, EOF is returned and errno is set to indicate the error.
-    // int err = errno;
-    // EBADF  stream is not an open stream, or is not open for writing.
-    return -1;  // static_cast<int>(ErrorCode::IoFailure);
+    const int ret = fflush_file_fp(stream_);
+    throw_exception_from_negative_value(ret);
+    return ret;
   }
 
   stream_length trunc(const stream_length size) override {
-    return truncate_file_fp(stream_, size);
+    const int64_t ret64 = ftruncate_file_fp(stream_, size);
+    throw_exception_from_negative_value(ret64);
+    return ret64;
   }
 
  private:
