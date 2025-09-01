@@ -6,6 +6,7 @@
 #include "cxx11bindings.h"
 
 #include <assert.h>
+#include <errno.h>
 #include <stdio.h>
 
 #ifdef _WIN32
@@ -28,6 +29,13 @@ static inline buf_size fread_file_fp(FILE* stream, byte* buffer,
     return C11_E_INVALIDARG;
   }
   const size_t read = fread(buffer, 1, count, stream);
+  if (read < count) {
+    if (ferror(stream)) {
+      // An error occurred
+      return C11_E_IO;
+    }
+  }
+  // short-read ok:
   return (buf_size)read;
 }
 
@@ -48,6 +56,9 @@ static inline buf_size fwrite_file_fp(FILE* stream, const byte* buffer,
 
 static inline int fseek_file_fp(FILE* stream, const int64_t offset,
                                 const seek_dir dir) {
+  if (!stream) {
+    return C11_E_POINTER;
+  }
   int whence;
   switch (dir) {
     case seek_beg:
@@ -67,10 +78,15 @@ static inline int fseek_file_fp(FILE* stream, const int64_t offset,
 #else
   const int ret = fseeko(stream, offset, whence);
 #endif
-  if (ret != 0) {
+  if (ret < 0) {
+    if (errno == EINVAL) {
+      // Invalid offset or whence
+      return C11_E_INVALIDARG;
+    }
+    // else
     return C11_E_IO;
   }
-  return 0;
+  return ret;
 }
 
 static inline int64_t ftell_file_fp(FILE* stream) {
@@ -86,20 +102,24 @@ static inline int64_t ftell_file_fp(FILE* stream) {
 }
 
 static inline int fflush_file_fp(FILE* stream) {
+  if (!stream) {
+    return C11_E_POINTER;
+  }
   const int ret = fflush(stream);
   // Otherwise, EOF is returned and errno is set to indicate the error.
   // EBADF  stream is not an open stream, or is not open for writing.
   if (ret < 0) {
     return C11_E_IO;
   }
-  assert(ret == 0);
   return ret;
 }
 
 // Truncate an open FILE* stream to a given size (in bytes).
 // Returns new size on success, -1 on error.
 static inline int64_t ftruncate_file_fp(FILE* fp, int64_t new_size) {
-  assert(fp);
+  if (!fp) {
+    return C11_E_POINTER;
+  }
   if (new_size < 0) {
     return C11_E_INVALIDARG;
   }

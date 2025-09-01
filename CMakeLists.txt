@@ -39,16 +39,15 @@ set(CXX11_API ${CXX11_ABI} cxx11bindings.hxx)
 set_source_files_properties(cxx11bindings.h PROPERTIES LANGUAGE C
                                                        HEADER_FILE_ONLY ON)
 
-set(SOURCES ${CXX11_API} stream_interface_impl.hxx)
-set_source_files_properties(stream_interface_impl.h PROPERTIES LANGUAGE C
-                                                       HEADER_FILE_ONLY ON)
+set(SOURCES ${CXX11_API} stream_interface_impl.hxx stream_interface_impl.h)
+set_source_files_properties(stream_interface_impl.h
+                            PROPERTIES LANGUAGE C HEADER_FILE_ONLY ON)
 add_library(${PLUGIN_NAME} INTERFACE ${SOURCES})
 
 # Specify include directories for consumers
-target_include_directories(${PLUGIN_NAME} INTERFACE
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
-    $<INSTALL_INTERFACE:include>
-)
+target_include_directories(
+  ${PLUGIN_NAME} INTERFACE $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
+                           $<INSTALL_INTERFACE:include>)
 
 # module library (e.g., plugin for dlopen) ----
 add_library(${PLUGIN_NAME}_module MODULE cxx11bindings.c)
@@ -88,7 +87,7 @@ if(BUILD_TESTING)
     target_compile_definitions(${PROJECT_NAME}_tests
                                PRIVATE _CRT_SECURE_NO_WARNINGS)
   endif()
-  target_link_libraries(
-    ${PROJECT_NAME}_tests PRIVATE GTest::gtest_main GTest::gtest)
+  target_link_libraries(${PROJECT_NAME}_tests PRIVATE GTest::gtest_main
+                                                      GTest::gtest)
   gtest_discover_tests(${PROJECT_NAME}_tests)
 endif()
