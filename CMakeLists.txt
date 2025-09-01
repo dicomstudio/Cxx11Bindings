@@ -40,6 +40,8 @@ set_source_files_properties(cxx11bindings.h PROPERTIES LANGUAGE C
                                                        HEADER_FILE_ONLY ON)
 
 set(SOURCES ${CXX11_API} stream_interface_impl.hxx)
+set_source_files_properties(stream_interface_impl.h PROPERTIES LANGUAGE C
+                                                       HEADER_FILE_ONLY ON)
 add_library(${PLUGIN_NAME} INTERFACE ${SOURCES})
 
 # Specify include directories for consumers
