@@ -21,7 +21,7 @@ extern "C" {
 #endif
 
 static inline buf_size fread_file_fp(FILE* stream, byte* buffer,
-                                     buf_size count) {
+                                     const buf_size count) {
   if (!buffer) {
     return C11_E_POINTER;
   }
@@ -29,7 +29,7 @@ static inline buf_size fread_file_fp(FILE* stream, byte* buffer,
     return C11_E_INVALIDARG;
   }
   const size_t read = fread(buffer, 1, count, stream);
-  if (read < count) {
+  if (read < (size_t)count) {
     if (ferror(stream)) {
       // An error occurred
       return C11_E_IO;
@@ -40,7 +40,7 @@ static inline buf_size fread_file_fp(FILE* stream, byte* buffer,
 }
 
 static inline buf_size fwrite_file_fp(FILE* stream, const byte* buffer,
-                                      buf_size count) {
+                                      const buf_size count) {
   if (!buffer) {
     return C11_E_POINTER;
   }
