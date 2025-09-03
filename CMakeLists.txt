@@ -50,7 +50,7 @@ target_include_directories(
                            $<INSTALL_INTERFACE:include>)
 
 # module library (e.g., plugin for dlopen) ----
-add_library(${PLUGIN_NAME}_module MODULE cxx11bindings.c)
+add_library(${PLUGIN_NAME}_module MODULE tests_cxx11bindings.c)
 target_link_libraries(${PLUGIN_NAME}_module ${PLUGIN_NAME})
 set_target_properties(
   ${PLUGIN_NAME}_module
