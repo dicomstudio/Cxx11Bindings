@@ -61,11 +61,14 @@ enum error_codes {
 struct c11_stream;
 // function declaration for stream interface
 // all return types are signed to allow error codes to be returned
-typedef buf_size (*read_fn)(byte* buffer, buf_size count);
-typedef buf_size (*write_fn)(const byte* buffer, buf_size count);
-typedef stream_offset (*seek_fn)(stream_offset off, seek_dir dir);
-typedef int (*flush_fn)(void);
-typedef stream_length (*trunc_fn)(stream_length size);
+typedef buf_size (*read_fn)(struct c11_stream* self, byte* buffer,
+                            buf_size count);
+typedef buf_size (*write_fn)(struct c11_stream* self, const byte* buffer,
+                             buf_size count);
+typedef stream_offset (*seek_fn)(struct c11_stream* self, stream_offset off,
+                                 seek_dir dir);
+typedef int (*flush_fn)(struct c11_stream* self);
+typedef stream_length (*trunc_fn)(struct c11_stream* self, stream_length size);
 
 // https://stackoverflow.com/questions/29631692/self-referencing-class-concrete-python-class-from-c-interface
 // Provides a simple basic stream interface, no buffering logic. Simply forward
@@ -95,7 +98,7 @@ static inline buf_size c11_stream_read(struct c11_stream* c11_stream,
                                        byte* buffer, const buf_size count) {
   CHECK_ARGS(c11_stream, C11_E_POINTER, read, C11_E_NOTSUPPORTED);
   // else
-  return c11_stream->read(buffer, count);
+  return c11_stream->read(c11_stream, buffer, count);
 }
 
 static inline buf_size c11_stream_write(struct c11_stream* c11_stream,
@@ -103,7 +106,7 @@ static inline buf_size c11_stream_write(struct c11_stream* c11_stream,
                                         const buf_size count) {
   CHECK_ARGS(c11_stream, C11_E_POINTER, write, C11_E_NOTSUPPORTED);
   // else
-  return c11_stream->write(buffer, count);
+  return c11_stream->write(c11_stream, buffer, count);
 }
 
 static inline stream_offset c11_stream_seek(struct c11_stream* c11_stream,
@@ -111,20 +114,20 @@ static inline stream_offset c11_stream_seek(struct c11_stream* c11_stream,
                                             const seek_dir dir) {
   CHECK_ARGS(c11_stream, C11_E_POINTER, seek, C11_E_NOTSUPPORTED);
   // else
-  return c11_stream->seek(off, dir);
+  return c11_stream->seek(c11_stream, off, dir);
 }
 
 static inline int c11_stream_flush(struct c11_stream* c11_stream) {
   CHECK_ARGS(c11_stream, C11_E_POINTER, flush, C11_E_NOTSUPPORTED);
   // else
-  return c11_stream->flush();
+  return c11_stream->flush(c11_stream);
 }
 
 static inline stream_length c11_stream_trunc(struct c11_stream* c11_stream,
                                              const stream_length size) {
   CHECK_ARGS(c11_stream, C11_E_POINTER, trunc, C11_E_NOTSUPPORTED);
   // else
-  return c11_stream->trunc(size);
+  return c11_stream->trunc(c11_stream, size);
 }
 
 #undef CHECK_ARGS

@@ -30,8 +30,13 @@ static inline buf_size fread_file_fp(FILE* stream, byte* buffer,
   }
   const size_t read = fread(buffer, 1, count, stream);
   if (read < (size_t)count) {
-    if (ferror(stream)) {
+    const int err = ferror(stream);
+    if (err) {
       // An error occurred
+      if (err == EPERM) {
+        return C11_E_NOTSUPPORTED;
+      }
+      // else
       return C11_E_IO;
     }
   }
