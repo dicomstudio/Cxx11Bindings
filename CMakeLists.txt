@@ -50,8 +50,8 @@ target_include_directories(
                            $<INSTALL_INTERFACE:include>)
 
 # module library (e.g., plugin for dlopen) ----
-add_library(${PLUGIN_NAME}_module MODULE tests_cxx11bindings.c
-                                         tests_stream_interface.c)
+add_library(${PLUGIN_NAME}_module MODULE
+            test_cxx11bindings.c test_file_stream.c test_filebuf_stream.cxx)
 target_link_libraries(${PLUGIN_NAME}_module ${PLUGIN_NAME})
 target_compile_definitions(${PROJECT_NAME}_module PUBLIC _FILE_OFFSET_BITS=64)
 target_compile_definitions(${PROJECT_NAME}_module
@@ -78,7 +78,7 @@ if(BUILD_TESTING)
   enable_testing()
 
   # verify that code can be compiled in C11-only:
-  add_executable(${PROJECT_NAME}_comp test_cfile.c tests_stream_interface.c)
+  add_executable(${PROJECT_NAME}_comp test_cfile.c test_file_stream.c)
   if(MSVC)
     target_compile_definitions(${PROJECT_NAME}_comp
                                PRIVATE _CRT_SECURE_NO_WARNINGS)

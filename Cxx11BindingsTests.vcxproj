@@ -64,8 +64,9 @@
   </ItemDefinitionGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
   <ItemGroup>
-    <ClCompile Include="tests_cxx11bindings.c" />
-    <ClCompile Include="tests_stream_interface.c" />
+    <ClCompile Include="test_cxx11bindings.c" />
+    <ClCompile Include="test_file_stream.c" />
+    <ClCompile Include="test_filebuf_stream.cxx" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="cxx11bindings.hxx" />
