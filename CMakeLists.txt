@@ -50,8 +50,16 @@ target_include_directories(
                            $<INSTALL_INTERFACE:include>)
 
 # module library (e.g., plugin for dlopen) ----
-add_library(${PLUGIN_NAME}_module MODULE tests_cxx11bindings.c)
+add_library(${PLUGIN_NAME}_module MODULE tests_cxx11bindings.c
+                                         tests_stream_interface.c)
 target_link_libraries(${PLUGIN_NAME}_module ${PLUGIN_NAME})
+target_compile_definitions(${PROJECT_NAME}_module PUBLIC _FILE_OFFSET_BITS=64)
+target_compile_definitions(${PROJECT_NAME}_module
+                           PUBLIC _POSIX_C_SOURCE=200112L)
+if(MSVC)
+  target_compile_definitions(${PLUGIN_NAME}_module
+                             PRIVATE _CRT_SECURE_NO_WARNINGS)
+endif()
 set_target_properties(
   ${PLUGIN_NAME}_module
   PROPERTIES OUTPUT_NAME ${PLUGIN_NAME}Tests
@@ -70,7 +78,7 @@ if(BUILD_TESTING)
   enable_testing()
 
   # verify that code can be compiled in C11-only:
-  add_executable(${PROJECT_NAME}_comp test_cfile.c)
+  add_executable(${PROJECT_NAME}_comp test_cfile.c tests_stream_interface.c)
   if(MSVC)
     target_compile_definitions(${PROJECT_NAME}_comp
                                PRIVATE _CRT_SECURE_NO_WARNINGS)
@@ -79,6 +87,7 @@ if(BUILD_TESTING)
   target_compile_definitions(${PROJECT_NAME}_comp PUBLIC _FILE_OFFSET_BITS=64)
   target_compile_definitions(${PROJECT_NAME}_comp
                              PUBLIC _POSIX_C_SOURCE=200112L)
+
   # Define test executable
   find_package(GTest CONFIG REQUIRED)
   include(GoogleTest)
