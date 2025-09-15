@@ -4,6 +4,10 @@
 #include <stddef.h>  // size_t
 #include <stdint.h>  // require c99
 
+#define CXX11BINDINGS_VERSION_MAJOR 2
+#define CXX11BINDINGS_VERSION_MINOR 0
+#define CXX11BINDINGS_VERSION_PATCH 0
+
 #ifdef __GNUC__
 #define CXX11_BINDINGS_EXPORT __attribute__((visibility("default")))
 #define CXX11_CHECK_RETURN __attribute__((__warn_unused_result__))
