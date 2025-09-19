@@ -34,7 +34,6 @@ class stream_interface {
 enum class ErrorCode : int {
   NullPointer = C11_E_POINTER,
   NotSupported = C11_E_NOTSUPPORTED,
-  NotImplemented = C11_E_NOTIMPL,
   InvalidArgument = C11_E_INVALIDARG,
   IOException = C11_E_IO
 };
@@ -55,13 +54,6 @@ class not_supported final : public std::runtime_error {
       : std::runtime_error(message) {}
 };
 
-class not_implemented final : public std::logic_error {
- public:
-  explicit not_implemented(
-      const std::string& message = "Function not yet implemented")
-      : std::logic_error(message) {}
-};
-
 class invalid_argument final : public std::runtime_error {
  public:
   explicit invalid_argument(const std::string& message = "Argument error")
@@ -80,8 +72,6 @@ static inline void throw_exception_from_enum(const ErrorCode err_code) {
       throw null_pointer();
     case ErrorCode::NotSupported:
       throw not_supported();
-    case ErrorCode::NotImplemented:
-      throw not_implemented();
     case ErrorCode::InvalidArgument:
       throw invalid_argument();
     case ErrorCode::IOException:
