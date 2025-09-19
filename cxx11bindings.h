@@ -53,10 +53,12 @@ enum error_codes {
   C11_E_POINTER = (int)0x80000000,
   // NotSupportedException
   C11_E_NOTSUPPORTED,
-  // NotImplementedException
-  C11_E_NOTIMPL,
   // ArgumentException
   C11_E_INVALIDARG,
+  // ArgumentOutOfRangeException
+  C11_E_ARGUMENTOUTOFRANGE,
+  // ObjectDisposedException
+  C11_E_OBJECTDISPOSED,
   // IOException
   C11_E_IO
 };
