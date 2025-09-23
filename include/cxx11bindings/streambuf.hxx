@@ -1,7 +1,7 @@
-#ifndef CXX11_BINDINGS_HXX
-#define CXX11_BINDINGS_HXX
+#ifndef CXX11_BINDINGS_STREAMBUF_HXX
+#define CXX11_BINDINGS_STREAMBUF_HXX
 
-#include "cxx11bindings.h"
+#include <cxx11bindings/stream.h>
 
 #include <algorithm>  // std::min
 #include <cassert>
@@ -35,6 +35,8 @@ enum class ErrorCode : int {
   NullPointer = C11_E_POINTER,
   NotSupported = C11_E_NOTSUPPORTED,
   InvalidArgument = C11_E_INVALIDARG,
+  ArgumentOutOfRange = C11_E_ARGUMENTOUTOFRANGE,
+  ObjectDisposed = C11_E_OBJECTDISPOSED,
   IOException = C11_E_IO
 };
 
@@ -60,6 +62,19 @@ class invalid_argument final : public std::runtime_error {
       : std::runtime_error(message) {}
 };
 
+class argument_out_of_range final : public std::runtime_error {
+ public:
+  explicit argument_out_of_range(
+      const std::string& message = "Argument Out Of Range")
+      : std::runtime_error(message) {}
+};
+
+class object_disposed final : public std::runtime_error {
+ public:
+  explicit object_disposed(const std::string& message = "Object Disposed")
+      : std::runtime_error(message) {}
+};
+
 class io_exception final : public std::runtime_error {
  public:
   explicit io_exception(const std::string& message = "io exception")
@@ -74,6 +89,10 @@ static inline void throw_exception_from_enum(const ErrorCode err_code) {
       throw not_supported();
     case ErrorCode::InvalidArgument:
       throw invalid_argument();
+    case ErrorCode::ArgumentOutOfRange:
+      throw argument_out_of_range();
+    case ErrorCode::ObjectDisposed:
+      throw object_disposed();
     case ErrorCode::IOException:
       throw io_exception();
   }
@@ -265,4 +284,4 @@ class basic_streambuf final : public std::streambuf {
 };
 }  // namespace cxx11
 
-#endif  // CXX11_BINDINGS_HXX
+#endif  // CXX11_BINDINGS_STREAMBUF_HXX

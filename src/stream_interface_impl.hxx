@@ -1,7 +1,7 @@
 // Mostly for internal testing, it provides different stream_interface
 // implementation using standard API (FILE*, std::streambuf)
 #pragma once
-#include "cxx11bindings.hxx"
+#include <cxx11bindings/streambuf.hxx>
 
 #include "stream_interface_impl.h"
 #include <ios>

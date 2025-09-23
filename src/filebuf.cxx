@@ -1,39 +1,49 @@
-#include "stream_interface_impl.h"
+#include <cxx11bindings/filebuf.hxx>
 
+#include "stream_interface_impl.h"
 #include <fstream>
 #ifdef _MSC_VER
 #include <windows.h>
 #endif
 
-struct filebuf_stream {
-  c11_stream super;
-  /* data */
-  std::filebuf file{};
-};
 #ifdef __cplusplus
 extern "C" {
 #endif
+struct filebuf_stream {
+  c11_stream super;
+  /* data */
+  std::streambuf& file;
+  bool is_created;
 
-CXX11_BINDINGS_EXPORT int test_cxx11_file_stream_create1(c11_stream** p_self,
-                                                         const char* filename,
-                                                         const char* mode);
-CXX11_BINDINGS_EXPORT int test_cxx11_file_stream_create2(
-    c11_stream** p_self, const wchar_t* filename, const wchar_t* wmode);
-CXX11_BINDINGS_EXPORT int test_cxx11_file_stream_destroy(c11_stream* self);
+  explicit filebuf_stream(std::streambuf& sb, const bool created)
+      : super(), file(sb), is_created(created) {}
+
+  ~filebuf_stream() {
+    if (is_created) {
+      std::streambuf* sb = &file;
+      // dynamic_cast on pointer does not throw:
+      const auto fb = dynamic_cast<std::filebuf*>(sb);
+      if (fb) {
+        // Successfully cast, can use fb
+        fb->close();
+      }
+    }
+  }
+};
 
 static buf_size my_read(c11_stream* self, byte* buffer, const buf_size count) {
   const auto fs = reinterpret_cast<filebuf_stream*>(self);
-  std::filebuf& file = fs->file;
+  std::streambuf& file = fs->file;
   const buf_size read =
       static_cast<buf_size>(file.sgetn(reinterpret_cast<char*>(buffer), count));
-  // cannot tell when an error occurs or just plain short-read.
+  // FIXME: cannot tell when an error occurs or just plain short-read.
   return read;
 }
 
 static buf_size my_write(c11_stream* self, const byte* buffer,
                          const buf_size count) {
   const auto fs = reinterpret_cast<filebuf_stream*>(self);
-  std::filebuf& file = fs->file;
+  std::streambuf& file = fs->file;
   const buf_size written = static_cast<buf_size>(
       file.sputn(reinterpret_cast<const char*>(buffer), count));
   if (written != count) {
@@ -45,7 +55,7 @@ static buf_size my_write(c11_stream* self, const byte* buffer,
 static stream_offset my_seek(c11_stream* self, const stream_offset offset,
                              const seek_dir dir) {
   const auto fs = reinterpret_cast<filebuf_stream*>(self);
-  std::filebuf& file = fs->file;
+  std::streambuf& file = fs->file;
   std::ios::seekdir seekdir;
   switch (dir) {
     case seek_beg:
@@ -66,7 +76,7 @@ static stream_offset my_seek(c11_stream* self, const stream_offset offset,
 
 static int my_flush(c11_stream* self) {
   const auto fs = reinterpret_cast<filebuf_stream*>(self);
-  std::filebuf& file = fs->file;
+  std::streambuf& file = fs->file;
   // Flush the filebuf
   if (file.pubsync() == 0) {
     return 0;
@@ -87,11 +97,10 @@ std::ios::openmode file_mode_to_ios_flags(const char* mode) {
   // Add more cases as needed
   return std::ios::openmode(0);  // Unknown mode
 }
-}  // namespace
 
-int test_cxx11_file_stream_create1(c11_stream** p_self, const char* filename,
-                                   const char* mode) {
-  const auto self = new filebuf_stream;
+int file_stream_init(c11_stream** p_self, std::streambuf& streambuf,
+                     const bool created) {
+  const auto self = new (std::nothrow) filebuf_stream(streambuf, created);
   if (self) {
     *p_self = &self->super;
     c11_stream* stream = &self->super;
@@ -100,17 +109,28 @@ int test_cxx11_file_stream_create1(c11_stream** p_self, const char* filename,
     stream->seek = my_seek;
     stream->flush = my_flush;
     stream->trunc = nullptr;  // not implemented for std::filebuf
-    const std::ios::openmode open_mode = file_mode_to_ios_flags(mode);
-    std::filebuf& file = self->file;
-    file.open(filename, open_mode);
-    if (file.is_open()) {
-      return 0;
-    }
-    // else error:
-    delete self;
+    // success
+    return 0;
   }
   *p_self = nullptr;
-  return -1;
+  return C11_E_POINTER;
+}
+}  // namespace
+
+int cxx11_file_stream_create1(c11_stream** p_self, const char* filename,
+                              const char* mode) {
+  if (filename && mode) {
+    const std::ios::openmode open_mode = file_mode_to_ios_flags(mode);
+    std::filebuf fb;
+    fb.open(filename, open_mode);
+    if (fb.is_open()) {
+      return file_stream_init(p_self, fb, true);
+    }
+    // else
+    return C11_E_IO;
+  }
+  // else
+  return C11_E_INVALIDARG;
 }
 
 #ifdef _MSC_VER
@@ -123,42 +143,40 @@ bool wchar_to_ascii(const wchar_t* wstr, char* str, const int str_size) {
 }
 }  // namespace
 #endif
-int test_cxx11_file_stream_create2(c11_stream** p_self, const wchar_t* filename,
-                                   const wchar_t* wmode) {
-  const auto self = new filebuf_stream;
-  if (self) {
-    *p_self = &self->super;
-    c11_stream* stream = &self->super;
-    stream->read = my_read;
-    stream->write = my_write;
-    stream->seek = my_seek;
-    stream->flush = my_flush;
-    stream->trunc = nullptr;
-    std::filebuf& file = self->file;
+int cxx11_file_stream_create2(c11_stream** p_self, const wchar_t* wfilename,
+                              const wchar_t* wmode) {
+  if (wfilename && wmode) {
+    std::filebuf fb;
 #ifdef _MSC_VER
     char mode[16];
     if (wchar_to_ascii(wmode, mode, sizeof mode)) {
       const std::ios::openmode open_mode = file_mode_to_ios_flags(mode);
-      file.open(filename, open_mode);
+      fb.open(wfilename, open_mode);
     }
 #endif
-    if (file.is_open()) {
-      return 0;
+    if (fb.is_open()) {
+      return file_stream_init(p_self, fb, true);
     }
-    // else error:
-    delete self;
+    // else
+    return C11_E_IO;
   }
-  *p_self = nullptr;
-  return -1;
+  // else
+  return C11_E_INVALIDARG;
 }
 
-int test_cxx11_file_stream_destroy(c11_stream* self) {
-  const auto fs = reinterpret_cast<filebuf_stream*>(self);
-  std::filebuf& file = fs->file;
-  const int ret = file.close() == nullptr ? -1 : 0;
-  delete fs;
-  return ret;
+int cxx11_file_stream_destroy(c11_stream* self) {
+  if (self) {
+    const auto fs = reinterpret_cast<filebuf_stream*>(self);
+    delete fs;
+    return 0;
+  }
+  return C11_E_INVALIDARG;
 }
+
+int cxx11_file_stream_init(c11_stream** p_self, std::streambuf& sb) {
+  return file_stream_init(p_self, sb, false);
+}
+
 #ifdef __cplusplus
 }  //  extern "C"
 #endif

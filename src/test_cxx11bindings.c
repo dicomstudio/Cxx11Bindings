@@ -1,6 +1,6 @@
 // cxx11bindings is a header-only library
 // Mostly used to expose symbols for testing purpose.
-#include "cxx11bindings.h"
+#include <cxx11bindings/stream.h>
 
 CXX11_BINDINGS_EXPORT buf_size test_c11_stream_read(
     struct c11_stream* c11_stream, byte* buffer, buf_size count);
