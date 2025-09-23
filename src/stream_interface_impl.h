@@ -3,7 +3,7 @@
 #ifndef STREAM_INTERFACE_IMPL_H
 #define STREAM_INTERFACE_IMPL_H
 
-#include "cxx11bindings.h"
+#include <cxx11bindings/stream.h>
 
 #include <assert.h>
 #include <errno.h>

@@ -1,5 +1,5 @@
-#ifndef CXX11_BINDINGS_H
-#define CXX11_BINDINGS_H
+#ifndef CXX11_BINDINGS_STREAM_H
+#define CXX11_BINDINGS_STREAM_H
 
 #include <stddef.h>  // size_t
 #include <stdint.h>  // require c99
@@ -141,4 +141,4 @@ static inline stream_length c11_stream_trunc(struct c11_stream* c11_stream,
 }  // end extern "C"
 #endif
 
-#endif  // CXX11_BINDINGS_H
+#endif  // CXX11_BINDINGS_STREAM_H
