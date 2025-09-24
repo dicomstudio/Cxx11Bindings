@@ -1,7 +1,8 @@
 #ifndef CXX11_BINDINGS_FILE_H
 #define CXX11_BINDINGS_FILE_H
 
-#include "stream.h"
+#include <cxx11bindings/stream.h>
+
 #include <stdio.h>
 
 #ifdef __cplusplus
