@@ -5,7 +5,7 @@
 #include <stdint.h>  // require c99
 
 #define CXX11BINDINGS_VERSION_MAJOR 3
-#define CXX11BINDINGS_VERSION_MINOR 0
+#define CXX11BINDINGS_VERSION_MINOR 1
 #define CXX11BINDINGS_VERSION_PATCH 0
 
 #ifdef __GNUC__
