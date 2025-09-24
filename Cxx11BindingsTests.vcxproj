@@ -63,14 +63,19 @@
     </ClCompile>
   </ItemDefinitionGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ItemDefinitionGroup>
+    <ClCompile>
+      <AdditionalIncludeDirectories>include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+  </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="test_cxx11bindings.c" />
-    <ClCompile Include="test_file_stream.c" />
-    <ClCompile Include="test_filebuf_stream.cxx" />
+    <ClCompile Include="src\test_cxx11bindings.c" />
+    <ClCompile Include="src\file.c" />
+    <ClCompile Include="src\filebuf.cxx" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="cxx11bindings.hxx" />
-    <ClInclude Include="cxx11bindings.h" />
+    <ClInclude Include="include\cxx11bindings\streambuf.hxx" />
+    <ClInclude Include="include\cxx11bindings\stream.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Targets" />
 </Project>
