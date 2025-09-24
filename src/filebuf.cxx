@@ -12,30 +12,24 @@ extern "C" {
 struct filebuf_stream {
   c11_stream super;
   /* data */
-  std::streambuf& file;
+  std::streambuf* file;
   bool is_created;
 
-  explicit filebuf_stream(std::streambuf& sb, const bool created)
+  explicit filebuf_stream(std::streambuf* sb, const bool created)
       : super(), file(sb), is_created(created) {}
 
   ~filebuf_stream() {
     if (is_created) {
-      std::streambuf* sb = &file;
-      // dynamic_cast on pointer does not throw:
-      const auto fb = dynamic_cast<std::filebuf*>(sb);
-      if (fb) {
-        // Successfully cast, can use fb
-        fb->close();
-      }
+      delete file;
     }
   }
 };
 
 static buf_size my_read(c11_stream* self, byte* buffer, const buf_size count) {
   const auto fs = reinterpret_cast<filebuf_stream*>(self);
-  std::streambuf& file = fs->file;
-  const buf_size read =
-      static_cast<buf_size>(file.sgetn(reinterpret_cast<char*>(buffer), count));
+  std::streambuf* file = fs->file;
+  const buf_size read = static_cast<buf_size>(
+      file->sgetn(reinterpret_cast<char*>(buffer), count));
   // FIXME: cannot tell when an error occurs or just plain short-read.
   return read;
 }
@@ -43,9 +37,9 @@ static buf_size my_read(c11_stream* self, byte* buffer, const buf_size count) {
 static buf_size my_write(c11_stream* self, const byte* buffer,
                          const buf_size count) {
   const auto fs = reinterpret_cast<filebuf_stream*>(self);
-  std::streambuf& file = fs->file;
+  std::streambuf* file = fs->file;
   const buf_size written = static_cast<buf_size>(
-      file.sputn(reinterpret_cast<const char*>(buffer), count));
+      file->sputn(reinterpret_cast<const char*>(buffer), count));
   if (written != count) {
     return C11_E_IO;
   }
@@ -55,7 +49,7 @@ static buf_size my_write(c11_stream* self, const byte* buffer,
 static stream_offset my_seek(c11_stream* self, const stream_offset offset,
                              const seek_dir dir) {
   const auto fs = reinterpret_cast<filebuf_stream*>(self);
-  std::streambuf& file = fs->file;
+  std::streambuf* file = fs->file;
   std::ios::seekdir seekdir;
   switch (dir) {
     case seek_beg:
@@ -70,15 +64,15 @@ static stream_offset my_seek(c11_stream* self, const stream_offset offset,
     default:
       return C11_E_INVALIDARG;
   }
-  const std::streampos pos = file.pubseekoff(offset, seekdir);
+  const std::streampos pos = file->pubseekoff(offset, seekdir);
   return pos;
 }
 
 static int my_flush(c11_stream* self) {
   const auto fs = reinterpret_cast<filebuf_stream*>(self);
-  std::streambuf& file = fs->file;
+  std::streambuf* file = fs->file;
   // Flush the filebuf
-  if (file.pubsync() == 0) {
+  if (file->pubsync() == 0) {
     return 0;
   }
   // Flush failed
@@ -98,7 +92,7 @@ std::ios::openmode file_mode_to_ios_flags(const char* mode) {
   return std::ios::openmode(0);  // Unknown mode
 }
 
-int file_stream_init(c11_stream** p_self, std::streambuf& streambuf,
+int file_stream_init(c11_stream** p_self, std::streambuf* streambuf,
                      const bool created) {
   const auto self = new (std::nothrow) filebuf_stream(streambuf, created);
   if (self) {
@@ -121,9 +115,9 @@ int cxx11_file_stream_create1(c11_stream** p_self, const char* filename,
                               const char* mode) {
   if (filename && mode) {
     const std::ios::openmode open_mode = file_mode_to_ios_flags(mode);
-    std::filebuf fb;
-    fb.open(filename, open_mode);
-    if (fb.is_open()) {
+    const auto fb = new std::filebuf();
+    fb->open(filename, open_mode);
+    if (fb->is_open()) {
       return file_stream_init(p_self, fb, true);
     }
     // else
@@ -146,15 +140,15 @@ bool wchar_to_ascii(const wchar_t* wstr, char* str, const int str_size) {
 int cxx11_file_stream_create2(c11_stream** p_self, const wchar_t* wfilename,
                               const wchar_t* wmode) {
   if (wfilename && wmode) {
-    std::filebuf fb;
+    const auto fb = new std::filebuf();
 #ifdef _MSC_VER
     char mode[16];
     if (wchar_to_ascii(wmode, mode, sizeof mode)) {
       const std::ios::openmode open_mode = file_mode_to_ios_flags(mode);
-      fb.open(wfilename, open_mode);
+      fb->open(wfilename, open_mode);
     }
 #endif
-    if (fb.is_open()) {
+    if (fb->is_open()) {
       return file_stream_init(p_self, fb, true);
     }
     // else
@@ -173,7 +167,7 @@ int cxx11_file_stream_destroy(c11_stream* self) {
   return C11_E_INVALIDARG;
 }
 
-int cxx11_file_stream_init(c11_stream** p_self, std::streambuf& sb) {
+int cxx11_file_stream_init(c11_stream** p_self, std::streambuf* sb) {
   return file_stream_init(p_self, sb, false);
 }
 

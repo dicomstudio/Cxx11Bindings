@@ -49,7 +49,7 @@ CXX11_BINDINGS_EXPORT int cxx11_file_stream_destroy(c11_stream* self);
  * @return
  */
 CXX11_BINDINGS_EXPORT int cxx11_file_stream_init(c11_stream** p_self,
-                                                 std::streambuf& sb);
+                                                 std::streambuf* sb);
 
 #ifdef __cplusplus
 }  // end extern "C"
