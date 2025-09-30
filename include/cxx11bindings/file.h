@@ -7,7 +7,6 @@
 
 #ifdef __cplusplus
 extern "C" {
-
 #endif
 
 /**
@@ -51,6 +50,16 @@ CXX11_BINDINGS_EXPORT int c11_file_stream_destroy(struct c11_stream* self);
  */
 CXX11_BINDINGS_EXPORT int c11_file_stream_init(struct c11_stream** p_self,
                                                FILE* stream);
+
+/**
+ * Initialize a c11_file_stream from an existing file descriptor.
+ * The file descriptor is not closed when the c11_stream is destroyed.
+ * @param p_self
+ * @param fd
+ * @return
+ */
+CXX11_BINDINGS_EXPORT int c11_fd_stream_init(struct c11_stream** p_self,
+                                             int fd);
 
 #ifdef __cplusplus
 }  // end extern "C"

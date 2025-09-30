@@ -18,7 +18,6 @@
 
 #ifdef __cplusplus
 extern "C" {
-
 #endif
 
 // C ABI to be used from C# P/Invoke or Python.ctypes
