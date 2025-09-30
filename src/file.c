@@ -137,6 +137,73 @@ int c11_file_stream_init(struct c11_stream** p_self, FILE* stream) {
 }
 
 #ifdef _WIN32
+struct handle_stream {
+  struct c11_stream super;
+  /* data */
+  HANDLE handle;
+  bool is_created;
+};
+static buf_size handle_read(struct c11_stream* self, byte* buffer,
+                          const buf_size count) {
+  struct handle_stream* fs = (struct handle_stream*)self;
+  const HANDLE handle = fs->handle;
+  const buf_size read = read_handle(handle, buffer, count);
+  return read;
+}
+static buf_size handle_write(struct c11_stream* self, const byte* buffer,
+                           const buf_size count) {
+  struct handle_stream* fs = (struct handle_stream*)self;
+  const HANDLE handle = fs->handle;
+  const buf_size written = write_handle(handle, buffer, count);
+  return written;
+}
+static stream_offset handle_seek(struct c11_stream* self,
+                               const stream_offset offset, const seek_dir dir) {
+  struct handle_stream* fs = (struct handle_stream*)self;
+  const HANDLE handle = fs->handle;
+  const int64_t pos = seek_handle(handle, offset, dir);
+  return pos;
+}
+static int handle_flush(struct c11_stream* self) {
+  struct handle_stream* fs = (struct handle_stream*)self;
+  const HANDLE handle = fs->handle;
+  const int ret = flush_handle(handle);
+  return ret;
+}
+
+static stream_length handle_trunc(struct c11_stream* self,
+                                const stream_length new_size) {
+  struct handle_stream* fs = (struct handle_stream*)self;
+  const HANDLE handle = fs->handle;
+  const int64_t ret = truncate_handle(handle, new_size);
+  return ret;
+}
+
+static int handle_stream_init(struct c11_stream** p_self, const HANDLE handle,
+                          const bool created) {
+  assert(handle!=NULL);
+  struct handle_stream* self = malloc(sizeof(*self));
+  if (self) {
+    *p_self = &self->super;
+    struct c11_stream* stream = &self->super;
+    stream->read = handle_read;
+    stream->write = handle_write;
+    stream->seek = handle_seek;
+    stream->flush = handle_flush;
+    stream->trunc = handle_trunc;
+    self->handle = handle;
+    self->is_created = created;
+    // success
+    return 0;
+  }
+  *p_self = NULL;
+  return C11_E_POINTER;
+}
+
+int c11_handle_stream_init(struct c11_stream** p_self, const HANDLE handle) {
+  if (handle != NULL) return handle_stream_init(p_self, handle, false);
+  return C11_E_INVALIDARG;
+}
 #else
 struct fd_stream {
   struct c11_stream super;
@@ -200,12 +267,9 @@ static int fd_stream_init(struct c11_stream** p_self, const int fd,
   *p_self = NULL;
   return C11_E_POINTER;
 }
-#endif
 
 int c11_fd_stream_init(struct c11_stream** p_self, int fd) {
-#ifdef _WIN32
-#else
   if (fd) return fd_stream_init(p_self, fd, false);
-#endif
   return C11_E_INVALIDARG;
 }
+#endif
