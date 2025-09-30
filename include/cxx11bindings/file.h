@@ -4,6 +4,11 @@
 #include <cxx11bindings/stream.h>
 
 #include <stdio.h>
+#ifdef _WIN32
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#undef WIN32_LEAN_AND_MEAN
+#endif
 
 #ifdef __cplusplus
 extern "C" {
@@ -51,6 +56,17 @@ CXX11_BINDINGS_EXPORT int c11_file_stream_destroy(struct c11_stream* self);
 CXX11_BINDINGS_EXPORT int c11_file_stream_init(struct c11_stream** p_self,
                                                FILE* stream);
 
+#ifdef _WIN32
+/**
+ * Initialize a c11_file_stream from an existing file handle.
+ * The file handle is not closed when the c11_stream is destroyed.
+ * @param p_self
+ * @param handle
+ * @return
+ */
+CXX11_BINDINGS_EXPORT int c11_handle_stream_init(struct c11_stream** p_self,
+                                                 HANDLE handle);
+#else
 /**
  * Initialize a c11_file_stream from an existing file descriptor.
  * The file descriptor is not closed when the c11_stream is destroyed.
@@ -60,6 +76,7 @@ CXX11_BINDINGS_EXPORT int c11_file_stream_init(struct c11_stream** p_self,
  */
 CXX11_BINDINGS_EXPORT int c11_fd_stream_init(struct c11_stream** p_self,
                                              int fd);
+#endif
 
 #ifdef __cplusplus
 }  // end extern "C"

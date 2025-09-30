@@ -11,6 +11,9 @@
 #ifdef _WIN32
 #include <fcntl.h>
 #include <io.h>  // _chsize_s
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#undef WIN32_LEAN_AND_MEAN
 #else
 #include <unistd.h>  // ftruncate
 #endif
@@ -157,6 +160,25 @@ static inline int64_t ftruncate_file_fp(FILE* fp, int64_t new_size) {
   return new_size;
 }
 #ifdef _WIN32
+static inline buf_size read_handle(const HANDLE handle, byte* buffer,
+                                   const buf_size count) {
+  if (handle == NULL) {
+    return C11_E_POINTER;
+  }
+  if (!buffer) {
+    return C11_E_POINTER;
+  }
+  if (count < 0) {
+    return C11_E_INVALIDARG;
+  }
+  DWORD bytes_read;
+  const BOOL success = ReadFile(handle, buffer, count, &bytes_read, NULL);
+  if (!success) {
+    return C11_E_IO;
+  }
+  // short-read ok:
+  return (buf_size)bytes_read;
+}
 #else
 static inline buf_size read_fd(int fileno, byte* buffer, const buf_size count) {
   if (fileno < 0) {
@@ -186,6 +208,24 @@ static inline buf_size read_fd(int fileno, byte* buffer, const buf_size count) {
 #endif
 
 #ifdef _WIN32
+static inline buf_size write_handle(const HANDLE handle, const byte* buffer,
+                                    const buf_size count) {
+  if (handle == NULL) {
+    return C11_E_POINTER;
+  }
+  if (!buffer) {
+    return C11_E_POINTER;
+  }
+  if (count < 0) {
+    return C11_E_INVALIDARG;
+  }
+  DWORD bytes_written;
+  const BOOL success = WriteFile(handle, buffer, count, &bytes_written, NULL);
+  if (!success) {
+    return C11_E_IO;
+  }
+  return (buf_size)bytes_written;
+}
 #else
 static inline buf_size write_fd(int fileno, const byte* buffer,
                                 const buf_size count) {
@@ -207,6 +247,37 @@ static inline buf_size write_fd(int fileno, const byte* buffer,
 #endif
 
 #ifdef _WIN32
+static inline int64_t seek_handle(const HANDLE handle, const int64_t offset,
+                                  const seek_dir dir) {
+  if (handle == NULL) {
+    return C11_E_POINTER;
+  }
+  int move_method;
+  switch (dir) {
+    case seek_beg:
+      move_method = FILE_BEGIN;
+      break;
+    case seek_cur:
+      move_method = FILE_CURRENT;
+      break;
+    case seek_end:
+      move_method = FILE_END;
+      break;
+    default:
+      return C11_E_INVALIDARG;
+  }
+
+  LARGE_INTEGER distance;
+  distance.QuadPart = offset;
+  LARGE_INTEGER pos;
+  const BOOL result = SetFilePointerEx(handle, distance, &pos, move_method);
+  if (!result) {
+    // handle error
+    return C11_E_IO;
+  }
+
+  return pos.QuadPart;
+}
 #else
 
 static inline int64_t lseek_fd(int fileno, const int64_t offset,
@@ -242,6 +313,18 @@ static inline int64_t lseek_fd(int fileno, const int64_t offset,
 #endif
 
 #ifdef _WIN32
+static inline int flush_handle(const HANDLE handle) {
+  if (handle == NULL) {
+    return C11_E_POINTER;
+  }
+
+  const BOOL success = FlushFileBuffers(handle);
+  if (!success) {
+    // handle error
+    return C11_E_IO;
+  }
+  return 0;
+}
 #else
 static inline int fsync_fd(int fd) {
   if (fd < 0) {
@@ -256,6 +339,30 @@ static inline int fsync_fd(int fd) {
 #endif
 
 #ifdef _WIN32
+
+static inline BOOL truncate_file_handle(const HANDLE handle,
+                                        const int64_t new_size) {
+  LARGE_INTEGER li;
+  li.QuadPart = new_size;
+  if (!SetFilePointerEx(handle, li, NULL, FILE_BEGIN)) {
+    return FALSE;
+  }
+  return SetEndOfFile(handle);
+}
+
+static inline int64_t truncate_handle(const HANDLE handle,
+                                      const int64_t new_size) {
+  if (handle == NULL) {
+    return C11_E_POINTER;
+  }
+  if (new_size < 0) {
+    return C11_E_INVALIDARG;
+  }
+  if (!truncate_file_handle(handle, new_size)) {
+    return C11_E_NOTSUPPORTED;
+  }
+  return new_size;
+}
 #else
 static inline int64_t ftruncate_fd(int fd, int64_t new_size) {
   if (fd < 0) {
