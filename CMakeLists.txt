@@ -72,6 +72,7 @@ if(C11B_BUILD_FILE OR C11B_BUILD_FILEBUF)
            $<INSTALL_INTERFACE:include>)
   # 64bits file IO
   target_compile_definitions(${LIBRARY_NAME}_common PUBLIC _FILE_OFFSET_BITS=64)
+  target_compile_definitions(${LIBRARY_NAME}_common PUBLIC _LARGEFILE64_SOURCE)
   target_compile_definitions(${LIBRARY_NAME}_common
                              PUBLIC _POSIX_C_SOURCE=200112L)
   if(MSVC)

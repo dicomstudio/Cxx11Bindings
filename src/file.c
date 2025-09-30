@@ -5,6 +5,7 @@
 #include <stdbool.h>
 #include <stdlib.h>
 #include <stddef.h>
+#include <assert.h>
 
 struct file_stream {
   struct c11_stream super;
@@ -132,5 +133,79 @@ int c11_file_stream_destroy(struct c11_stream* self) {
 
 int c11_file_stream_init(struct c11_stream** p_self, FILE* stream) {
   if (stream) return file_stream_init(p_self, stream, false);
+  return C11_E_INVALIDARG;
+}
+
+#ifdef _WIN32
+#else
+struct fd_stream {
+  struct c11_stream super;
+  /* data */
+  int fd;
+  bool is_created;
+};
+static buf_size fd_read(struct c11_stream* self, byte* buffer,
+                          const buf_size count) {
+  struct fd_stream* fs = (struct fd_stream*)self;
+  const int fd = fs->fd;
+  const buf_size read = read_fd(fd, buffer, count);
+  return read;
+}
+static buf_size fd_write(struct c11_stream* self, const byte* buffer,
+                           const buf_size count) {
+  struct fd_stream* fs = (struct fd_stream*)self;
+  const int fd = fs->fd;
+  const buf_size written = write_fd(fd, buffer, count);
+  return written;
+}
+static stream_offset fd_seek(struct c11_stream* self,
+                               const stream_offset offset, const seek_dir dir) {
+  struct fd_stream* fs = (struct fd_stream*)self;
+  const int fd = fs->fd;
+  const int64_t pos = lseek_fd(fd, offset, dir);
+  return pos;
+}
+static int fd_flush(struct c11_stream* self) {
+  struct fd_stream* fs = (struct fd_stream*)self;
+  const int fd = fs->fd;
+  const int ret = fsync_fd(fd);
+  return ret;
+}
+
+static stream_length fd_trunc(struct c11_stream* self,
+                                const stream_length new_size) {
+  struct fd_stream* fs = (struct fd_stream*)self;
+  const int fd = fs->fd;
+  const int64_t ret = ftruncate_fd(fd, new_size);
+  return ret;
+}
+
+static int fd_stream_init(struct c11_stream** p_self, const int fd,
+                          const bool created) {
+  assert(fd!=0);
+  struct fd_stream* self = malloc(sizeof(*self));
+  if (self) {
+    *p_self = &self->super;
+    struct c11_stream* stream = &self->super;
+    stream->read = fd_read;
+    stream->write = fd_write;
+    stream->seek = fd_seek;
+    stream->flush = fd_flush;
+    stream->trunc = fd_trunc;
+    self->fd = fd;
+    self->is_created = created;
+    // success
+    return 0;
+  }
+  *p_self = NULL;
+  return C11_E_POINTER;
+}
+#endif
+
+int c11_fd_stream_init(struct c11_stream** p_self, int fd) {
+#ifdef _WIN32
+#else
+  if (fd) return fd_stream_init(p_self, fd, false);
+#endif
   return C11_E_INVALIDARG;
 }
