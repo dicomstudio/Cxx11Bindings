@@ -25,7 +25,8 @@ struct filebuf_stream {
   }
 };
 
-static buf_size my_read(c11_stream* self, byte* buffer, const buf_size count) {
+static buf_size file_read(c11_stream* self, byte* buffer,
+                          const buf_size count) {
   const auto fs = reinterpret_cast<filebuf_stream*>(self);
   std::streambuf* file = fs->file;
   const buf_size read = static_cast<buf_size>(
@@ -34,8 +35,8 @@ static buf_size my_read(c11_stream* self, byte* buffer, const buf_size count) {
   return read;
 }
 
-static buf_size my_write(c11_stream* self, const byte* buffer,
-                         const buf_size count) {
+static buf_size file_write(c11_stream* self, const byte* buffer,
+                           const buf_size count) {
   const auto fs = reinterpret_cast<filebuf_stream*>(self);
   std::streambuf* file = fs->file;
   const buf_size written = static_cast<buf_size>(
@@ -46,8 +47,8 @@ static buf_size my_write(c11_stream* self, const byte* buffer,
   return written;
 }
 
-static stream_offset my_seek(c11_stream* self, const stream_offset offset,
-                             const seek_dir dir) {
+static stream_offset file_seek(c11_stream* self, const stream_offset offset,
+                               const seek_dir dir) {
   const auto fs = reinterpret_cast<filebuf_stream*>(self);
   std::streambuf* file = fs->file;
   std::ios::seekdir seekdir;
@@ -68,7 +69,7 @@ static stream_offset my_seek(c11_stream* self, const stream_offset offset,
   return pos;
 }
 
-static int my_flush(c11_stream* self) {
+static int file_flush(c11_stream* self) {
   const auto fs = reinterpret_cast<filebuf_stream*>(self);
   std::streambuf* file = fs->file;
   // Flush the filebuf
@@ -98,10 +99,10 @@ int file_stream_init(c11_stream** p_self, std::streambuf* streambuf,
   if (self) {
     *p_self = &self->super;
     c11_stream* stream = &self->super;
-    stream->read = my_read;
-    stream->write = my_write;
-    stream->seek = my_seek;
-    stream->flush = my_flush;
+    stream->read = file_read;
+    stream->write = file_write;
+    stream->seek = file_seek;
+    stream->flush = file_flush;
     stream->trunc = nullptr;  // not implemented for std::filebuf
     // success
     return 0;

@@ -14,24 +14,24 @@ struct file_stream {
 };
 
 
-static buf_size my_read(struct c11_stream* self, byte* buffer,
-                        const buf_size count) {
+static buf_size file_read(struct c11_stream* self, byte* buffer,
+                          const buf_size count) {
   struct file_stream* fs = (struct file_stream*)self;
   FILE* stream = fs->file;
   const buf_size read = fread_file_fp(stream, buffer, count);
   return read;
 }
 
-static buf_size my_write(struct c11_stream* self, const byte* buffer,
-                         const buf_size count) {
+static buf_size file_write(struct c11_stream* self, const byte* buffer,
+                           const buf_size count) {
   struct file_stream* fs = (struct file_stream*)self;
   FILE* stream = fs->file;
   const buf_size written = fwrite_file_fp(stream, buffer, count);
   return written;
 }
 
-static stream_offset my_seek(struct c11_stream* self,
-                             const stream_offset offset, const seek_dir dir) {
+static stream_offset file_seek(struct c11_stream* self,
+                               const stream_offset offset, const seek_dir dir) {
   struct file_stream* fs = (struct file_stream*)self;
   FILE* stream = fs->file;
   const int ret32 = fseek_file_fp(stream, offset, dir);
@@ -41,15 +41,15 @@ static stream_offset my_seek(struct c11_stream* self,
   return ret64;
 }
 
-static int my_flush(struct c11_stream* self) {
+static int file_flush(struct c11_stream* self) {
   struct file_stream* fs = (struct file_stream*)self;
   FILE* stream = fs->file;
   const int ret = fflush_file_fp(stream);
   return ret;
 }
 
-static stream_length my_trunc(struct c11_stream* self,
-                              const stream_length new_size) {
+static stream_length file_trunc(struct c11_stream* self,
+                                const stream_length new_size) {
   struct file_stream* fs = (struct file_stream*)self;
   FILE* stream = fs->file;
   const int64_t ret = ftruncate_file_fp(stream, new_size);
@@ -63,11 +63,11 @@ static int file_stream_init(struct c11_stream** p_self, FILE* file,
   if (self) {
     *p_self = &self->super;
     struct c11_stream* stream = &self->super;
-    stream->read = my_read;
-    stream->write = my_write;
-    stream->seek = my_seek;
-    stream->flush = my_flush;
-    stream->trunc = my_trunc;
+    stream->read = file_read;
+    stream->write = file_write;
+    stream->seek = file_seek;
+    stream->flush = file_flush;
+    stream->trunc = file_trunc;
     self->file = file;
     self->is_created = created;
     // success
