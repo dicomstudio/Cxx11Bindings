@@ -162,8 +162,8 @@ static inline int64_t ftruncate_file_fp(FILE* fp, int64_t new_size) {
 #ifdef _WIN32
 static inline buf_size read_handle(const HANDLE handle, byte* buffer,
                                    const buf_size count) {
-  if (handle == NULL) {
-    return C11_E_POINTER;
+  if (handle == INVALID_HANDLE_VALUE) {
+    return C11_E_INVALIDARG;
   }
   if (!buffer) {
     return C11_E_POINTER;
@@ -210,8 +210,8 @@ static inline buf_size read_fd(int fileno, byte* buffer, const buf_size count) {
 #ifdef _WIN32
 static inline buf_size write_handle(const HANDLE handle, const byte* buffer,
                                     const buf_size count) {
-  if (handle == NULL) {
-    return C11_E_POINTER;
+  if (handle == INVALID_HANDLE_VALUE) {
+    return C11_E_INVALIDARG;
   }
   if (!buffer) {
     return C11_E_POINTER;
@@ -249,8 +249,8 @@ static inline buf_size write_fd(int fileno, const byte* buffer,
 #ifdef _WIN32
 static inline int64_t seek_handle(const HANDLE handle, const int64_t offset,
                                   const seek_dir dir) {
-  if (handle == NULL) {
-    return C11_E_POINTER;
+  if (handle == INVALID_HANDLE_VALUE) {
+    return C11_E_INVALIDARG;
   }
   int move_method;
   switch (dir) {
@@ -314,8 +314,8 @@ static inline int64_t lseek_fd(int fileno, const int64_t offset,
 
 #ifdef _WIN32
 static inline int flush_handle(const HANDLE handle) {
-  if (handle == NULL) {
-    return C11_E_POINTER;
+  if (handle == INVALID_HANDLE_VALUE) {
+    return C11_E_INVALIDARG;
   }
 
   const BOOL success = FlushFileBuffers(handle);
@@ -352,8 +352,8 @@ static inline BOOL truncate_file_handle(const HANDLE handle,
 
 static inline int64_t truncate_handle(const HANDLE handle,
                                       const int64_t new_size) {
-  if (handle == NULL) {
-    return C11_E_POINTER;
+  if (handle == INVALID_HANDLE_VALUE) {
+    return C11_E_INVALIDARG;
   }
   if (new_size < 0) {
     return C11_E_INVALIDARG;
