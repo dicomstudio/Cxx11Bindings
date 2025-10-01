@@ -9,6 +9,95 @@
 #include <string>
 
 namespace cxx11 {
+#ifdef _WIN32
+// stream_interface implementation using file handle
+class handle_stream final : public stream_interface {
+ public:
+  explicit handle_stream(const HANDLE handle) : handle_(handle) {
+    if (handle == INVALID_HANDLE_VALUE) {
+      throw invalid_argument();
+    }
+  }
+
+  buf_size read(byte* buf, const buf_size count) override {
+    const buf_size ret = read_handle(handle_, buf, count);
+    throw_exception_from_negative_value(ret);
+    // short-read ok:
+    return ret;
+  }
+
+  buf_size write(const byte* buf, const buf_size count) override {
+    const buf_size ret = write_handle(handle_, buf, count);
+    throw_exception_from_negative_value(ret);
+    return ret;
+  }
+
+  stream_offset seek(const stream_offset off, const seek_dir dir) override {
+    const int64_t ret64 = seek_handle(handle_, off, dir);
+    throw_exception_from_negative_value(ret64);
+    return ret64;
+  }
+
+  int flush() override {
+    const int ret = flush_handle(handle_);
+    throw_exception_from_negative_value(ret);
+    return ret;
+  }
+
+  stream_length trunc(const stream_length size) override {
+    const int64_t ret64 = truncate_handle(handle_, size);
+    throw_exception_from_negative_value(ret64);
+    return ret64;
+  }
+
+ private:
+  HANDLE handle_;
+};
+#else
+// stream_interface implementation using file descriptor
+class fd_stream final : public stream_interface {
+ public:
+  explicit fd_stream(int fd) : fd_(fd) {
+    if (fd < 0) {
+      throw invalid_argument();
+    }
+  }
+
+  buf_size read(byte* buf, const buf_size count) override {
+    const buf_size ret = read_fd(fd_, buf, count);
+    throw_exception_from_negative_value(ret);
+    // short-read ok:
+    return ret;
+  }
+
+  buf_size write(const byte* buf, const buf_size count) override {
+    const buf_size ret = write_fd(fd_, buf, count);
+    throw_exception_from_negative_value(ret);
+    return ret;
+  }
+
+  stream_offset seek(const stream_offset off, const seek_dir dir) override {
+    const int64_t ret64 = lseek_fd(fd_, off, dir);
+    throw_exception_from_negative_value(ret64);
+    return ret64;
+  }
+
+  int flush() override {
+    const int ret = fsync_fd(fd_);
+    throw_exception_from_negative_value(ret);
+    return ret;
+  }
+
+  stream_length trunc(const stream_length size) override {
+    const int64_t ret64 = ftruncate_fd(fd_, size);
+    throw_exception_from_negative_value(ret64);
+    return ret64;
+  }
+
+ private:
+  int fd_;
+};
+#endif
 // stream_interface implementation using FILE*
 class cfile_stream final : public stream_interface {
  public:

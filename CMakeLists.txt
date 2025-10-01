@@ -43,9 +43,6 @@ set_source_files_properties(${CXX11_ABI} PROPERTIES LANGUAGE C HEADER_FILE_ONLY
 
 set(SOURCES ${CXX11_API} src/stream_interface_impl.hxx
             src/stream_interface_impl.h)
-set_source_files_properties(src/stream_interface_impl.h
-                            PROPERTIES LANGUAGE C HEADER_FILE_ONLY ON)
-
 if(C11B_BUILD_FILE)
   list(APPEND SOURCES src/file.c)
   list(APPEND SOURCES include/cxx11bindings/file.h)
