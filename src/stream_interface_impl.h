@@ -8,8 +8,8 @@
 #include <errno.h>
 #include <stdio.h>
 
-#ifdef _WIN32
 #include <fcntl.h>
+#ifdef _WIN32
 #include <io.h>  // _chsize_s
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
