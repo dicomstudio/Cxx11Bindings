@@ -249,7 +249,7 @@ static stream_length fd_trunc(struct c11_stream* self,
 
 static int fd_stream_init(struct c11_stream** p_self, const int fd,
                           const bool created) {
-  assert(fd!=0);
+  assert(fd>=0);
   struct fd_stream* self = malloc(sizeof(*self));
   if (self) {
     *p_self = &self->super;
@@ -269,7 +269,7 @@ static int fd_stream_init(struct c11_stream** p_self, const int fd,
 }
 
 int c11_fd_stream_init(struct c11_stream** p_self, int fd) {
-  if (fd) return fd_stream_init(p_self, fd, false);
+  if (fd>=0) return fd_stream_init(p_self, fd, false);
   return C11_E_INVALIDARG;
 }
 #endif
