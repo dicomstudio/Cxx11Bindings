@@ -117,6 +117,7 @@ class c_stream final : public stream_interface {
   c_stream& operator=(c_stream&& other) noexcept = delete;
 
   explicit c_stream(c11_stream* c11_stream) : stream_interface() {
+    if (!c11_stream) throw null_pointer();
     c11_stream_ = c11_stream;
   }
 
