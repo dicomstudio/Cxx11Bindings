@@ -220,6 +220,7 @@ static inline buf_size write_handle(const HANDLE handle, const byte* buffer,
     return C11_E_INVALIDARG;
   }
   DWORD bytes_written;
+  // write data directly to the file handle, no buffering:
   const BOOL success = WriteFile(handle, buffer, count, &bytes_written, NULL);
   if (!success) {
     return C11_E_IO;
