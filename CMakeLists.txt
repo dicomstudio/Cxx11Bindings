@@ -35,6 +35,10 @@ set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 set(CMAKE_C_EXTENSIONS OFF)
 
+if(MSVC)
+  add_compile_options(/we4273)
+endif()
+
 # config
 set(LIBRARY_NAME Cxx11Bindings)
 option(C11B_BUILD_FILE "Build the FILE implementation" ON)
@@ -77,9 +81,6 @@ target_include_directories(${LIBRARY_NAME}_common
                            PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
 target_compile_definitions(${LIBRARY_NAME}_common
                            PRIVATE CXX11_BINDINGS_BUILD)
-if(MSVC)
-  target_compile_options(${LIBRARY_NAME}_common PRIVATE /we4273)
-endif()
 if(C11B_BUILD_FILE OR C11B_BUILD_FILEBUF)
   # add_library(${LIBRARY_NAME} SHARED ${SOURCES})
   add_library(${LIBRARY_NAME} SHARED $<TARGET_OBJECTS:${LIBRARY_NAME}_common>)
@@ -107,10 +108,8 @@ endif()
 add_library(${LIBRARY_NAME}_module MODULE
             $<TARGET_OBJECTS:${LIBRARY_NAME}_common> src/test_cxx11bindings.c)
 target_compile_definitions(${LIBRARY_NAME}_module
-                           PRIVATE CXX11_BINDINGS_BUILD)
-if(MSVC)
-  target_compile_options(${LIBRARY_NAME}_module PRIVATE /we4273)
-endif()
+                           PRIVATE CXX11_BINDINGS_BUILD
+                                   CXX11_BINDINGS_TEST_MODULE)
 target_include_directories(${LIBRARY_NAME}_module
                            PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
 set_target_properties(
