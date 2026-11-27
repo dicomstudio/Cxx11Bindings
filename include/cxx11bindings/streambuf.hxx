@@ -165,14 +165,20 @@ class basic_streambuf final : public std::streambuf {
 
     std::memmove(buffer_.data() + (put_back_size - putback), gptr() - putback,
                  putback);
+    setg(buffer_.data() + (put_back_size - putback),
+         buffer_.data() + put_back_size, buffer_.data() + put_back_size);
 
     // ->read() call may throw, but this is legitimate behavior:
     // https://developercommunity.visualstudio.com/t/Exception-from-streambuf-should-be-caugh/10555755
     // https://stackoverflow.com/a/77704741/136285
     // https://github.com/microsoft/STL/issues/4322
-    const buf_size n =
-        stream_.read(reinterpret_cast<byte*>(buffer_.data() + put_back_size),
-                     static_cast<buf_size>(buffer_.size() - put_back_size));
+    const buf_size count = static_cast<buf_size>(buffer_.size() - put_back_size);
+    const buf_size n = stream_.read(
+        reinterpret_cast<byte*>(buffer_.data() + put_back_size), count);
+    throw_exception_from_negative_value(n);
+    if (n > count) {
+      throw stream_exception(ErrorCode::InvalidOperation);
+    }
     if (n == 0) {
       return traits_type::eof();
     }

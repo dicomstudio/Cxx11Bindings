@@ -20,6 +20,8 @@ ABI-facing `c11_stream`; it is a C++ adapter, not the C ABI itself.
 The optional `basic_streambuf` buffer size must be positive and small enough
 for its putback space and callback counts. Zero throws `std::invalid_argument`;
 sizes exceeding the supported range throw `std::length_error` before allocation.
+`basic_streambuf` throws `stream_exception` for a negative read result and
+uses `InvalidOperation` when a read reports more bytes than requested.
 
 The optional compiled shared library supplies `FILE*` and `std::filebuf`
 implementations of the interface. These are useful examples or ready-made
