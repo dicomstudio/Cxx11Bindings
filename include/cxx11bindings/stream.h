@@ -142,6 +142,9 @@ static inline stream_offset c11_stream_seek(struct c11_stream* c11_stream,
                                             const stream_offset off,
                                             const seek_dir dir) {
   CHECK_ARGS(c11_stream, C11_E_POINTER, seek, C11_E_NOTSUPPORTED);
+  if (dir != seek_beg && dir != seek_cur && dir != seek_end) {
+    return C11_E_INVALIDARG;
+  }
   // else
   return c11_stream->seek(c11_stream, off, dir);
 }
