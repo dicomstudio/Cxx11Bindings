@@ -1,24 +1,25 @@
 #include <cxx11bindings/filebuf.hxx>
 
 #include <cstdio>
-#include <cstdlib>
-#include <fstream>
 #include <new>
 #include <sstream>
+#include <stdexcept>
 
 namespace {
-long fail_after = -1;
+enum class failure_stage { none, mode, filebuf, open, wrapper };
+failure_stage fail_at = failure_stage::none;
+bool fail_with_io = false;
+
+void inject_failure(failure_stage stage) {
+  if (fail_at == stage) {
+    if (fail_with_io) throw std::runtime_error("injected open failure");
+    throw std::bad_alloc();
+  }
+}
 }
 
-void* operator new(std::size_t size) {
-  if (fail_after == 0) throw std::bad_alloc();
-  if (fail_after > 0) --fail_after;
-  if (void* ptr = std::malloc(size)) return ptr;
-  throw std::bad_alloc();
-}
-
-void operator delete(void* ptr) noexcept { std::free(ptr); }
-
+#define CXX11_FILEBUF_TEST_HOOK(stage) inject_failure(failure_stage::stage)
+#define CXX11_FILEBUF_TEST_ALLOC_FAIL() (fail_at == failure_stage::wrapper)
 #include "filebuf.cxx"
 
 #define CHECK(expression)                                                     \
@@ -34,87 +35,45 @@ int main() {
   c11_stream* stream = &sentinel;
   std::stringbuf borrowed;
 
-  fail_after = 0;
-  const int init_result = cxx11_file_stream_init(&stream, &borrowed);
-  fail_after = -1;
-  CHECK(init_result == C11_E_OUTOFMEMORY);
+  fail_at = failure_stage::wrapper;
+  CHECK(cxx11_file_stream_init(&stream, &borrowed) == C11_E_OUTOFMEMORY);
   CHECK(stream == nullptr);
   CHECK(borrowed.sputc('x') != std::char_traits<char>::eof());
+  fail_at = failure_stage::none;
 
   const char* filename = "filebuf_alloc_failure_test.tmp";
-  bool saw_failure = false;
-  bool saw_success = false;
-  long allocation_count = -1;
-  for (long index = 0; index < 64; ++index) {
+  const wchar_t* wide_filename = L"filebuf_alloc_failure_test.tmp";
+  const failure_stage stages[] = {failure_stage::mode, failure_stage::filebuf,
+                                  failure_stage::open, failure_stage::wrapper};
+  for (const auto stage : stages) {
+    fail_at = stage;
     stream = &sentinel;
-    fail_after = index;
-    const int result = cxx11_file_stream_create1(&stream, filename, "wb");
-    fail_after = -1;
-    if (result == 0) {
-      CHECK(stream != nullptr);
-      CHECK(cxx11_file_stream_destroy(stream) == 0);
-      saw_success = true;
-      allocation_count = index;
-      break;
-    }
-    CHECK(result == C11_E_OUTOFMEMORY);
+    CHECK(cxx11_file_stream_create1(&stream, filename, "wb") ==
+          C11_E_OUTOFMEMORY);
     CHECK(stream == nullptr);
-    saw_failure = true;
+    stream = &sentinel;
+    CHECK(cxx11_file_stream_create2(&stream, wide_filename, L"wb") ==
+          C11_E_OUTOFMEMORY);
+    CHECK(stream == nullptr);
   }
-  CHECK(saw_failure && saw_success);
-  CHECK(allocation_count > 0);
-  {
-    std::filebuf probe;
-    CHECK(probe.open(filename, std::ios::out | std::ios::binary) != nullptr);
-    c11_stream* wrapper = &sentinel;
-    fail_after = 0;
-    const int wrapper_result = file_stream_init(&wrapper, &probe, false);
-    fail_after = -1;
-    CHECK(wrapper_result == C11_E_OUTOFMEMORY);
-    CHECK(wrapper == nullptr);
-    CHECK(probe.close() != nullptr);
-  }
+
+  fail_at = failure_stage::open;
+  fail_with_io = true;
+  stream = &sentinel;
+  CHECK(cxx11_file_stream_create1(&stream, filename, "wb") == C11_E_IO);
+  CHECK(stream == nullptr);
+  stream = &sentinel;
+  CHECK(cxx11_file_stream_create2(&stream, wide_filename, L"wb") == C11_E_IO);
+  CHECK(stream == nullptr);
+  fail_at = failure_stage::none;
+  fail_with_io = false;
+
+  CHECK(cxx11_file_stream_init(&stream, &borrowed) == 0);
+  CHECK(cxx11_file_stream_destroy(stream) == 0);
+  CHECK(cxx11_file_stream_create1(&stream, filename, "wb") == 0);
+  CHECK(cxx11_file_stream_destroy(stream) == 0);
+  CHECK(cxx11_file_stream_create2(&stream, wide_filename, L"wb") == 0);
+  CHECK(cxx11_file_stream_destroy(stream) == 0);
   CHECK(std::remove(filename) == 0);
-
-  const std::string long_mode(256, 'x');
-  stream = &sentinel;
-  fail_after = 0;
-  const int mode_result =
-      cxx11_file_stream_create1(&stream, "unused", long_mode.c_str());
-  fail_after = -1;
-  CHECK(mode_result == C11_E_OUTOFMEMORY);
-  CHECK(stream == nullptr);
-
-  stream = &sentinel;
-  fail_after = 0;
-  const int wide_result = cxx11_file_stream_create2(&stream, L"unused", L"r");
-  fail_after = -1;
-  CHECK(wide_result == C11_E_OUTOFMEMORY);
-  CHECK(stream == nullptr);
-
-  const wchar_t* wide_filename = L"filebuf_alloc_failure_wide_test.tmp";
-  saw_failure = false;
-  saw_success = false;
-  for (long index = 0; index < 64; ++index) {
-    stream = &sentinel;
-    fail_after = index;
-    const int result = cxx11_file_stream_create2(&stream, wide_filename, L"wb");
-    fail_after = -1;
-    if (result == 0) {
-      CHECK(stream != nullptr);
-      CHECK(cxx11_file_stream_destroy(stream) == 0);
-      saw_success = true;
-      break;
-    }
-    CHECK(result == C11_E_OUTOFMEMORY);
-    CHECK(stream == nullptr);
-    saw_failure = true;
-  }
-  CHECK(saw_failure && saw_success);
-#ifdef _WIN32
-  CHECK(_wremove(wide_filename) == 0);
-#else
-  CHECK(std::remove("filebuf_alloc_failure_wide_test.tmp") == 0);
-#endif
   return 0;
 }

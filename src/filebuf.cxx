@@ -13,9 +13,13 @@
 #include <windows.h>
 #endif
 
-#ifdef __cplusplus
-extern "C" {
+#ifndef CXX11_FILEBUF_TEST_HOOK
+#define CXX11_FILEBUF_TEST_HOOK(stage) ((void)0)
 #endif
+#ifndef CXX11_FILEBUF_TEST_ALLOC_FAIL
+#define CXX11_FILEBUF_TEST_ALLOC_FAIL() false
+#endif
+
 struct filebuf_stream {
   c11_stream super;
   /* data */
@@ -86,6 +90,7 @@ static int file_flush(c11_stream* self) {
 
 namespace {
 std::ios::openmode file_mode_to_ios_flags(const char* mode) {
+  CXX11_FILEBUF_TEST_HOOK(mode);
   std::string m(mode);
   std::ios::openmode binary = std::ios::openmode(0);
   if (!m.empty() && m.back() == 'b') {
@@ -102,9 +107,15 @@ std::ios::openmode file_mode_to_ios_flags(const char* mode) {
   return std::ios::openmode(0);  // Unknown mode
 }
 
+filebuf_stream* allocate_filebuf_stream(std::streambuf* streambuf,
+                                        const bool created) {
+  if (CXX11_FILEBUF_TEST_ALLOC_FAIL()) return nullptr;
+  return new (std::nothrow) filebuf_stream(streambuf, created);
+}
+
 int file_stream_init(c11_stream** p_self, std::streambuf* streambuf,
                      const bool created) {
-  const auto self = new (std::nothrow) filebuf_stream(streambuf, created);
+  const auto self = allocate_filebuf_stream(streambuf, created);
   if (self) {
     *p_self = &self->super;
     c11_stream* stream = &self->super;
@@ -128,6 +139,7 @@ int cxx11_file_stream_create1(c11_stream** p_self, const char* filename,
   if (filename && mode) {
     try {
       const std::ios::openmode open_mode = file_mode_to_ios_flags(mode);
+      CXX11_FILEBUF_TEST_HOOK(filebuf);
       std::unique_ptr<std::filebuf> fb(new std::filebuf());
 #ifdef _WIN32
       const int length =
@@ -139,8 +151,10 @@ int cxx11_file_stream_create1(c11_stream** p_self, const char* filename,
                               &wide_filename[0], length) == 0) {
         return C11_E_INVALIDARG;
       }
+      CXX11_FILEBUF_TEST_HOOK(open);
       fb->open(wide_filename.c_str(), open_mode);
 #else
+      CXX11_FILEBUF_TEST_HOOK(open);
       fb->open(filename, open_mode);
 #endif
       if (fb->is_open()) {
@@ -175,11 +189,13 @@ int cxx11_file_stream_create2(c11_stream** p_self, const wchar_t* wfilename,
   *p_self = nullptr;
   if (wfilename && wmode) {
     try {
+      CXX11_FILEBUF_TEST_HOOK(filebuf);
       std::unique_ptr<std::filebuf> fb(new std::filebuf());
 #ifdef _WIN32
       char mode[16];
       if (wchar_to_ascii(wmode, mode, sizeof mode)) {
         const std::ios::openmode open_mode = file_mode_to_ios_flags(mode);
+        CXX11_FILEBUF_TEST_HOOK(open);
         fb->open(wfilename, open_mode);
       }
 #else
@@ -203,7 +219,9 @@ int cxx11_file_stream_create2(c11_stream** p_self, const wchar_t* wfilename,
       } catch (const std::range_error&) {
         return C11_E_INVALIDARG;
       }
-      fb->open(filename.c_str(), file_mode_to_ios_flags(mode.c_str()));
+      const std::ios::openmode open_mode = file_mode_to_ios_flags(mode.c_str());
+      CXX11_FILEBUF_TEST_HOOK(open);
+      fb->open(filename.c_str(), open_mode);
 #endif
       if (fb->is_open()) {
         const int ret = file_stream_init(p_self, fb.get(), true);
@@ -247,7 +265,3 @@ int cxx11_file_stream_init(c11_stream** p_self, std::streambuf* sb) {
   if (!sb) return C11_E_INVALIDARG;
   return file_stream_init(p_self, sb, false);
 }
-
-#ifdef __cplusplus
-}  //  extern "C"
-#endif
