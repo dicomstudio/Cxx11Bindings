@@ -1,7 +1,24 @@
 cmake_minimum_required(VERSION 3.14)
+
+set(CXX11BINDINGS_VERSION_HEADER
+    "${CMAKE_CURRENT_LIST_DIR}/include/cxx11bindings/stream.h")
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
+             "${CXX11BINDINGS_VERSION_HEADER}")
+foreach(component MAJOR MINOR PATCH)
+  file(STRINGS "${CXX11BINDINGS_VERSION_HEADER}" version_definition
+       REGEX "^#define[ \t]+CXX11BINDINGS_VERSION_${component}([ \t]|$)")
+  list(LENGTH version_definition definition_count)
+  if(NOT definition_count EQUAL 1 OR
+     NOT version_definition MATCHES
+         "^#define[ \t]+CXX11BINDINGS_VERSION_${component}[ \t]+(0|[1-9][0-9]*)[ \t]*$")
+    message(FATAL_ERROR
+            "Expected one numeric CXX11BINDINGS_VERSION_${component} definition in ${CXX11BINDINGS_VERSION_HEADER}")
+  endif()
+  set(CXX11BINDINGS_VERSION_${component} "${CMAKE_MATCH_1}")
+endforeach()
 project(
   Cxx11Bindings
-  VERSION 3.1.0
+  VERSION ${CXX11BINDINGS_VERSION_MAJOR}.${CXX11BINDINGS_VERSION_MINOR}.${CXX11BINDINGS_VERSION_PATCH}
   LANGUAGES CXX C)
 
 # only export limited set of symbols
