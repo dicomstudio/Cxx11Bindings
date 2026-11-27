@@ -37,7 +37,19 @@ enum class ErrorCode : int {
   InvalidArgument = C11_E_INVALIDARG,
   ArgumentOutOfRange = C11_E_ARGUMENTOUTOFRANGE,
   ObjectDisposed = C11_E_OBJECTDISPOSED,
-  IOException = C11_E_IO
+  IOException = C11_E_IO,
+  InvalidOperation = C11_E_INVALIDOPERATION,
+  Unauthorized = C11_E_UNAUTHORIZED,
+  OutOfMemory = C11_E_OUTOFMEMORY,
+  Timeout = C11_E_TIMEOUT,
+  Canceled = C11_E_CANCELED,
+  FileNotFound = C11_E_FILENOTFOUND,
+  DirectoryNotFound = C11_E_DIRECTORYNOTFOUND,
+  PathTooLong = C11_E_PATHTOOLONG,
+  EndOfStream = C11_E_ENDOFSTREAM,
+  ArgumentNull = C11_E_ARGUMENTNULL,
+  NotImplemented = C11_E_NOTIMPLEMENTED,
+  Unmapped = C11_E_UNMAPPED
 };
 
 // Custom exception class
@@ -81,6 +93,16 @@ class io_exception final : public std::runtime_error {
       : std::runtime_error(message) {}
 };
 
+class callback_exception final : public std::runtime_error {
+ public:
+  explicit callback_exception(ErrorCode code)
+      : std::runtime_error("C11 callback failed"), code_(code) {}
+  ErrorCode code() const noexcept { return code_; }
+
+ private:
+  ErrorCode code_;
+};
+
 static inline void throw_exception_from_enum(const ErrorCode err_code) {
   switch (err_code) {
     case ErrorCode::NullPointer:
@@ -95,6 +117,19 @@ static inline void throw_exception_from_enum(const ErrorCode err_code) {
       throw object_disposed();
     case ErrorCode::IOException:
       throw io_exception();
+    case ErrorCode::InvalidOperation:
+    case ErrorCode::Unauthorized:
+    case ErrorCode::OutOfMemory:
+    case ErrorCode::Timeout:
+    case ErrorCode::Canceled:
+    case ErrorCode::FileNotFound:
+    case ErrorCode::DirectoryNotFound:
+    case ErrorCode::PathTooLong:
+    case ErrorCode::EndOfStream:
+    case ErrorCode::ArgumentNull:
+    case ErrorCode::NotImplemented:
+    case ErrorCode::Unmapped:
+      throw callback_exception(err_code);
   }
   assert(0);
 }

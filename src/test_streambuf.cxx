@@ -5,6 +5,24 @@
 #include <gtest/gtest.h>
 #include <sstream>
 
+TEST(ErrorMapping, ExtendedCallbackErrorsRetainTheirCodes) {
+  const cxx11::ErrorCode codes[] = {
+      cxx11::ErrorCode::InvalidOperation, cxx11::ErrorCode::Unauthorized,
+      cxx11::ErrorCode::OutOfMemory, cxx11::ErrorCode::Timeout,
+      cxx11::ErrorCode::Canceled, cxx11::ErrorCode::FileNotFound,
+      cxx11::ErrorCode::DirectoryNotFound, cxx11::ErrorCode::PathTooLong,
+      cxx11::ErrorCode::EndOfStream, cxx11::ErrorCode::ArgumentNull,
+      cxx11::ErrorCode::NotImplemented, cxx11::ErrorCode::Unmapped};
+  for (const auto code : codes) {
+    try {
+      cxx11::throw_exception_from_negative_value(static_cast<int>(code));
+      FAIL() << "Expected callback exception";
+    } catch (const cxx11::callback_exception& ex) {
+      EXPECT_EQ(ex.code(), code);
+    }
+  }
+}
+
 class short_write_streambuf : public std::streambuf {
  public:
   explicit short_write_streambuf(std::streamsize limit) : limit_(limit) {}
