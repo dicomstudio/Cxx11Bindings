@@ -9,6 +9,17 @@
 #include <limits>
 #include <sstream>
 
+TEST(FilebufStreamInit, RejectsNullArguments) {
+  std::stringbuf buffer;
+  EXPECT_EQ(cxx11_file_stream_init(nullptr, &buffer), C11_E_POINTER);
+  EXPECT_EQ(cxx11_file_stream_init(nullptr, nullptr), C11_E_POINTER);
+  c11_stream sentinel = {};
+  c11_stream* stream = &sentinel;
+  EXPECT_EQ(cxx11_file_stream_init(&stream, nullptr), C11_E_INVALIDARG);
+  EXPECT_EQ(stream, nullptr);
+  EXPECT_NE(buffer.sputc('x'), std::char_traits<char>::eof());
+}
+
 TEST(FilebufStreamCreate, ClearsOutputOnFailure) {
   c11_stream sentinel = {};
   c11_stream* stream = &sentinel;
