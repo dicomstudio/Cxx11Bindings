@@ -2,6 +2,8 @@
 
 #include "stream_interface_impl.h"
 #include <fstream>
+#include <memory>
+#include <new>
 #ifdef _MSC_VER
 #include <windows.h>
 #endif
@@ -109,11 +111,8 @@ int file_stream_init(c11_stream** p_self, std::streambuf* streambuf,
     // success
     return 0;
   }
-  if (created) {
-    delete streambuf;
-  }
   *p_self = nullptr;
-  return C11_E_POINTER;
+  return C11_E_OUTOFMEMORY;
 }
 }  // namespace
 
@@ -122,15 +121,21 @@ int cxx11_file_stream_create1(c11_stream** p_self, const char* filename,
   if (!p_self) return C11_E_POINTER;
   *p_self = nullptr;
   if (filename && mode) {
-    const std::ios::openmode open_mode = file_mode_to_ios_flags(mode);
-    const auto fb = new std::filebuf();
-    fb->open(filename, open_mode);
-    if (fb->is_open()) {
-      return file_stream_init(p_self, fb, true);
+    try {
+      const std::ios::openmode open_mode = file_mode_to_ios_flags(mode);
+      std::unique_ptr<std::filebuf> fb(new std::filebuf());
+      fb->open(filename, open_mode);
+      if (fb->is_open()) {
+        const int ret = file_stream_init(p_self, fb.get(), true);
+        if (ret == 0) fb.release();
+        return ret;
+      }
+      return C11_E_IO;
+    } catch (const std::bad_alloc&) {
+      return C11_E_OUTOFMEMORY;
+    } catch (...) {
+      return C11_E_IO;
     }
-    // else
-    delete fb;
-    return C11_E_IO;
   }
   // else
   return C11_E_INVALIDARG;
@@ -151,20 +156,26 @@ int cxx11_file_stream_create2(c11_stream** p_self, const wchar_t* wfilename,
   if (!p_self) return C11_E_POINTER;
   *p_self = nullptr;
   if (wfilename && wmode) {
-    const auto fb = new std::filebuf();
+    try {
+      std::unique_ptr<std::filebuf> fb(new std::filebuf());
 #ifdef _MSC_VER
-    char mode[16];
-    if (wchar_to_ascii(wmode, mode, sizeof mode)) {
-      const std::ios::openmode open_mode = file_mode_to_ios_flags(mode);
-      fb->open(wfilename, open_mode);
-    }
+      char mode[16];
+      if (wchar_to_ascii(wmode, mode, sizeof mode)) {
+        const std::ios::openmode open_mode = file_mode_to_ios_flags(mode);
+        fb->open(wfilename, open_mode);
+      }
 #endif
-    if (fb->is_open()) {
-      return file_stream_init(p_self, fb, true);
+      if (fb->is_open()) {
+        const int ret = file_stream_init(p_self, fb.get(), true);
+        if (ret == 0) fb.release();
+        return ret;
+      }
+      return C11_E_IO;
+    } catch (const std::bad_alloc&) {
+      return C11_E_OUTOFMEMORY;
+    } catch (...) {
+      return C11_E_IO;
     }
-    // else
-    delete fb;
-    return C11_E_IO;
   }
   // else
   return C11_E_INVALIDARG;

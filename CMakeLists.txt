@@ -195,6 +195,17 @@ if(BUILD_TESTING)
              COMMAND ${PROJECT_NAME}_file_alloc_failure_tests)
   endif()
 
+  if(C11B_BUILD_FILEBUF)
+    add_executable(${PROJECT_NAME}_filebuf_alloc_failure_tests
+                   src/test_filebuf_alloc_failure.cxx)
+    target_include_directories(${PROJECT_NAME}_filebuf_alloc_failure_tests
+                               PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
+    target_compile_definitions(${PROJECT_NAME}_filebuf_alloc_failure_tests
+                               PRIVATE CXX11_BINDINGS_BUILD)
+    add_test(NAME FilebufStreamAllocationFailure
+             COMMAND ${PROJECT_NAME}_filebuf_alloc_failure_tests)
+  endif()
+
   if(C11B_BUILD_FILE AND C11B_BUILD_FILEBUF)
     # Define test executable
     find_package(GTest CONFIG REQUIRED)
