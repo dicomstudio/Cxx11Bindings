@@ -18,7 +18,8 @@ extern "C" {
  * @param p_self
  * @param filename
  * @param mode
- * @return
+ * @return 0 on success; C11_E_OUTOFMEMORY on allocation failure, C11_E_IO on
+ * other opening failures, or a negative argument error.
  */
 CXX11_BINDINGS_EXPORT int cxx11_file_stream_create1(c11_stream** p_self,
                                                     const char* filename,
@@ -32,7 +33,8 @@ CXX11_BINDINGS_EXPORT int cxx11_file_stream_create1(c11_stream** p_self,
  * @param p_self
  * @param wfilename
  * @param wmode
- * @return
+ * @return 0 on success; C11_E_OUTOFMEMORY on allocation failure, C11_E_IO on
+ * other opening failures, or a negative argument error.
  */
 CXX11_BINDINGS_EXPORT int cxx11_file_stream_create2(c11_stream** p_self,
                                                     const wchar_t* wfilename,
