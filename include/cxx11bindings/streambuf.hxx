@@ -228,11 +228,11 @@ class basic_streambuf final : public std::streambuf {
       off -= egptr() - gptr();
     }
 
-    const stream_offset pos = stream_.seek(off, origin);
-
-    // Invalidate buffer after seek
+    // A failed or throwing seek may still change the underlying position.
     setg(buffer_.data() + put_back_size, buffer_.data() + put_back_size,
          buffer_.data() + put_back_size);
+    const stream_offset pos = stream_.seek(off, origin);
+
     setp(buffer_.data(), buffer_.data() + buffer_.size());
 
     if (pos < 0) {

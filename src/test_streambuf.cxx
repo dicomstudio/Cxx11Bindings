@@ -329,6 +329,7 @@ class memory_stream : public cxx11::stream_interface {
   bool overreport_write = false;
   bool fail_seek = false;
   bool throw_on_seek = false;
+  bool throw_after_seek = false;
   int read_calls = 0;
   int write_calls = 0;
   int seek_calls = 0;
@@ -382,6 +383,8 @@ class memory_stream : public cxx11::stream_interface {
       return -1;
     }
     position = target;
+    if (throw_after_seek)
+      throw cxx11::stream_exception(cxx11::ErrorCode::IOException);
     return position;
   }
 
@@ -533,6 +536,31 @@ TEST(DefaultStreamBuf, PropagatesSeekException) {
 
   EXPECT_THROW(buffer.pubseekoff(0, std::ios_base::beg, std::ios_base::in),
                cxx11::stream_exception);
+}
+
+TEST(DefaultStreamBuf, ThrowingSeekInvalidatesBufferedInput) {
+  for (const bool relative : {false, true}) {
+    memory_stream target;
+    target.input = "abcdef";
+    cxx11::basic_streambuf buffer(target, 4);
+    ASSERT_EQ(buffer.sbumpc(), 'a');
+    ASSERT_EQ(target.position, 4);
+
+    target.throw_after_seek = true;
+    if (relative) {
+      EXPECT_THROW(buffer.pubseekoff(1, std::ios_base::cur, std::ios_base::in),
+                   cxx11::stream_exception);
+      EXPECT_EQ(target.last_seek_offset, -2);
+      EXPECT_EQ(target.position, 2);
+      EXPECT_EQ(buffer.sgetc(), 'c');
+    } else {
+      EXPECT_THROW(buffer.pubseekpos(3, std::ios_base::in),
+                   cxx11::stream_exception);
+      EXPECT_EQ(target.position, 3);
+      EXPECT_EQ(buffer.sgetc(), 'd');
+    }
+    EXPECT_EQ(target.read_calls, 2);
+  }
 }
 
 TEST(DefaultStreamBuf, DestructorFlushesPendingOutput) {
