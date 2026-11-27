@@ -270,14 +270,15 @@ class basic_streambuf final : public std::streambuf {
   std::vector<char> buffer_;
 
   int flush_buffer() {
-    const std::ptrdiff_t n = pptr() - pbase();
-    if (n > 0) {
+    while (pptr() != pbase()) {
+      const std::ptrdiff_t n = pptr() - pbase();
       const buf_size ret = stream_.write(reinterpret_cast<const byte*>(pbase()),
                                          static_cast<buf_size>(n));
-      if (ret != static_cast<buf_size>(n)) {
+      if (ret <= 0 || ret > n) {
         return traits_type::eof();
       }
-      pbump(static_cast<int>(-n));
+      std::memmove(pbase(), pbase() + ret, static_cast<std::size_t>(n - ret));
+      pbump(-ret);
     }
     return 0;
   }
