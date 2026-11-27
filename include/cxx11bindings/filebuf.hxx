@@ -38,8 +38,10 @@ CXX11_BINDINGS_EXPORT int cxx11_file_stream_create2(c11_stream** p_self,
 /**
  * Destroy a cxx11_file_stream, if created by cxx11_file_stream_create1 or
  * cxx11_file_stream_create2 underlying stream will be closed.
+ * The wrapper is destroyed even if closing the owned stream fails.
  * @param self
- * @return
+ * @return 0 on success, C11_E_IO on close failure, or C11_E_INVALIDARG if
+ * self is null.
  */
 CXX11_BINDINGS_EXPORT int cxx11_file_stream_destroy(c11_stream* self);
 
