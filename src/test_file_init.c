@@ -34,6 +34,17 @@ int main(void) {
   struct c11_stream* stream = NULL;
   CHECK(c11_file_stream_init(&stream, file) == 0);
   CHECK(stream != NULL);
+  const byte contents[] = {'a', 'b', 'c', 'd'};
+  byte readback[sizeof contents];
+  CHECK(c11_stream_write(stream, contents, sizeof contents) == sizeof contents);
+  CHECK(c11_stream_seek(stream, 0, seek_beg) == 0);
+  CHECK(c11_stream_read(stream, readback, 1) == 1);
+  CHECK(readback[0] == 'a');
+  CHECK(c11_stream_trunc(stream, 2) == 2);
+  CHECK(c11_stream_seek(stream, 0, seek_cur) == 1);
+  CHECK(c11_stream_read(stream, readback, sizeof readback) == 1);
+  CHECK(readback[0] == 'b');
+  CHECK(c11_stream_read(stream, readback, sizeof readback) == 0);
   CHECK(c11_file_stream_destroy(stream) == 0);
   CHECK(fclose(file) == 0);
 
