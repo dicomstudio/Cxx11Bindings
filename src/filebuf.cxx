@@ -1,6 +1,11 @@
 #include <cxx11bindings/filebuf.hxx>
 
 #include "stream_interface_impl.h"
+#ifndef _MSC_VER
+#include <climits>
+#include <codecvt>
+#include <locale>
+#endif
 #include <fstream>
 #include <memory>
 #include <new>
@@ -164,6 +169,29 @@ int cxx11_file_stream_create2(c11_stream** p_self, const wchar_t* wfilename,
         const std::ios::openmode open_mode = file_mode_to_ios_flags(mode);
         fb->open(wfilename, open_mode);
       }
+#endif
+#ifndef _MSC_VER
+#if WCHAR_MAX <= 0xffff
+      std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>> converter;
+#else
+      std::wstring_convert<std::codecvt_utf8<wchar_t>> converter;
+#endif
+      std::string filename;
+      std::string mode;
+      try {
+        filename = converter.to_bytes(wfilename);
+        if (converter.converted() !=
+            std::char_traits<wchar_t>::length(wfilename)) {
+          return C11_E_INVALIDARG;
+        }
+        mode = converter.to_bytes(wmode);
+        if (converter.converted() != std::char_traits<wchar_t>::length(wmode)) {
+          return C11_E_INVALIDARG;
+        }
+      } catch (const std::range_error&) {
+        return C11_E_INVALIDARG;
+      }
+      fb->open(filename.c_str(), file_mode_to_ios_flags(mode.c_str()));
 #endif
       if (fb->is_open()) {
         const int ret = file_stream_init(p_self, fb.get(), true);
