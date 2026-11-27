@@ -174,7 +174,8 @@ if(BUILD_TESTING)
     add_executable(${PROJECT_NAME}_comp src/test_cfile.c)
     target_link_libraries(${LIBRARY_NAME}_comp PRIVATE ${LIBRARY_NAME})
 
-    add_executable(${PROJECT_NAME}_file_init_tests src/test_file_init.c)
+    add_executable(${PROJECT_NAME}_file_init_tests src/test_file_init.c
+                                                  src/test_cxx11bindings.c)
     target_link_libraries(${PROJECT_NAME}_file_init_tests PRIVATE ${LIBRARY_NAME})
     add_test(NAME FileStreamInitialization COMMAND ${PROJECT_NAME}_file_init_tests)
   endif()
