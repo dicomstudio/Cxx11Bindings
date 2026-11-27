@@ -42,6 +42,30 @@ TEST(FilebufStreamCreate, RejectsNullOutput) {
   EXPECT_EQ(cxx11_file_stream_create2(nullptr, nullptr, nullptr), C11_E_POINTER);
 }
 
+TEST(FilebufStreamCreate, NullOutputDoesNotTruncateFile) {
+  const char* filename = "filebuf_null_output_test.tmp";
+  {
+    std::ofstream output(filename, std::ios::binary | std::ios::trunc);
+    ASSERT_TRUE(output.is_open());
+    output << "original";
+    output.close();
+    ASSERT_TRUE(output.good());
+  }
+
+  EXPECT_EQ(cxx11_file_stream_create1(nullptr, filename, "wb"), C11_E_POINTER);
+  EXPECT_EQ(cxx11_file_stream_create2(nullptr, L"filebuf_null_output_test.tmp",
+                                     L"wb"),
+            C11_E_POINTER);
+
+  std::ifstream input(filename, std::ios::binary);
+  ASSERT_TRUE(input.is_open());
+  std::string contents;
+  std::getline(input, contents);
+  EXPECT_EQ(contents, "original");
+  input.close();
+  EXPECT_EQ(std::remove(filename), 0);
+}
+
 TEST(FilebufStreamCreate, OpensUtf8FilenameForWritingAndReading) {
   const char* filename = "filebuf_utf8_\xc3\xa9_\xf0\x9f\x98\x80.tmp";
   c11_stream* stream = nullptr;
