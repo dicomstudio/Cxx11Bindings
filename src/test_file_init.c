@@ -8,6 +8,8 @@
 
 #include <stdio.h>
 
+int test_c11_stream_seek_direction(void);
+
 #ifndef _WIN32
 #include <errno.h>
 #include <fcntl.h>
@@ -25,6 +27,7 @@
 
 int main(void) {
   FILE* file = tmpfile();
+  CHECK(test_c11_stream_seek_direction() == 0);
   CHECK(file != NULL);
 
   CHECK(c11_file_stream_create1(NULL, "unused", "wb") == C11_E_POINTER);
