@@ -23,6 +23,16 @@ struct file_deleter {
   }
 };
 
+#define EXPECT_CALLBACK_ERROR(expression, expected)                          \
+  do {                                                                       \
+    try {                                                                    \
+      (void)(expression);                                                    \
+      ADD_FAILURE() << "Expected stream_exception";                        \
+    } catch (const cxx11::stream_exception& ex) {                          \
+      EXPECT_EQ(ex.raw_code(), static_cast<int64_t>(expected));              \
+    }                                                                        \
+  } while (0)
+
 TEST(CFileStream, ReadWriteSeekFlushAndTruncate) {
   std::unique_ptr<FILE, file_deleter> file(std::tmpfile());
   ASSERT_NE(file.get(), nullptr);
@@ -69,20 +79,20 @@ TEST(CFileStream, TruncateDiscardsBufferedInputAndPreservesPosition) {
 }
 
 TEST(CFileStream, RejectsNullAndInvalidArguments) {
-  EXPECT_THROW(cxx11::cfile_stream(nullptr), cxx11::null_pointer);
+  EXPECT_CALLBACK_ERROR(cxx11::cfile_stream(nullptr), C11_E_POINTER);
 
   std::unique_ptr<FILE, file_deleter> file(std::tmpfile());
   ASSERT_NE(file.get(), nullptr);
   cxx11::cfile_stream stream(file.get());
   byte value = 0;
 
-  EXPECT_THROW(stream.read(nullptr, 1), cxx11::null_pointer);
-  EXPECT_THROW(stream.read(&value, -1), cxx11::invalid_argument);
-  EXPECT_THROW(stream.write(nullptr, 1), cxx11::null_pointer);
-  EXPECT_THROW(stream.write(&value, -1), cxx11::invalid_argument);
-  EXPECT_THROW(stream.seek(0, static_cast<seek_dir>(-1)),
-               cxx11::invalid_argument);
-  EXPECT_THROW(stream.trunc(-1), cxx11::invalid_argument);
+  EXPECT_CALLBACK_ERROR(stream.read(nullptr, 1), C11_E_POINTER);
+  EXPECT_CALLBACK_ERROR(stream.read(&value, -1), C11_E_INVALIDARG);
+  EXPECT_CALLBACK_ERROR(stream.write(nullptr, 1), C11_E_POINTER);
+  EXPECT_CALLBACK_ERROR(stream.write(&value, -1), C11_E_INVALIDARG);
+  EXPECT_CALLBACK_ERROR(stream.seek(0, static_cast<seek_dir>(-1)),
+                        C11_E_INVALIDARG);
+  EXPECT_CALLBACK_ERROR(stream.trunc(-1), C11_E_INVALIDARG);
 }
 
 TEST(CFileStream, ZeroLengthOperationsAndEndOfFile) {
@@ -132,7 +142,7 @@ TEST(CFileStream, SeekBeforeBeginningReportsInvalidArgument) {
   std::unique_ptr<FILE, file_deleter> file(std::tmpfile());
   ASSERT_NE(file.get(), nullptr);
   cxx11::cfile_stream stream(file.get());
-  EXPECT_THROW(stream.seek(-1, seek_dirs::seek_beg), cxx11::invalid_argument);
+  EXPECT_CALLBACK_ERROR(stream.seek(-1, seek_dirs::seek_beg), C11_E_INVALIDARG);
   EXPECT_EQ(stream.seek(0, seek_dirs::seek_cur), 0);
 }
 
@@ -158,15 +168,11 @@ TEST(CFileStream, NonseekableFileReportsErrors) {
   ASSERT_NE(file.get(), nullptr);
   cxx11::cfile_stream stream(file.get());
 
-  EXPECT_THROW(stream.seek(0, seek_dirs::seek_cur), cxx11::io_exception);
+  EXPECT_CALLBACK_ERROR(stream.seek(0, seek_dirs::seek_cur), C11_E_IO);
   EXPECT_EQ(ftell_file_fp(file.get()), C11_E_IO);
   const int64_t result = ftruncate_file_fp(file.get(), 1);
   ASSERT_TRUE(result == C11_E_IO || result == C11_E_NOTSUPPORTED);
-  if (result == C11_E_IO) {
-    EXPECT_THROW(stream.trunc(1), cxx11::io_exception);
-  } else {
-    EXPECT_THROW(stream.trunc(1), cxx11::not_supported);
-  }
+  EXPECT_CALLBACK_ERROR(stream.trunc(1), result);
 }
 
 TEST(CFileStream, ReadErrorAndPartialProgress) {
@@ -193,7 +199,7 @@ TEST(CFileStream, ReadErrorAndPartialProgress) {
   EXPECT_EQ(data[0], 'a');
   EXPECT_EQ(data[1], 'b');
   EXPECT_TRUE(std::ferror(file.get()));
-  EXPECT_THROW(stream.read(data, sizeof data), cxx11::io_exception);
+  EXPECT_CALLBACK_ERROR(stream.read(data, sizeof data), C11_E_IO);
   EXPECT_EQ(stream.read(data, 0), 0);
   std::clearerr(file.get());
   writer.reset();
@@ -234,8 +240,8 @@ TEST(CFileStream, WriteErrorAndPartialProgress) {
   EXPECT_GT(partial, 0);
   EXPECT_LT(partial, static_cast<buf_size>(data.size()));
   EXPECT_TRUE(std::ferror(writer.get()));
-  EXPECT_THROW(stream.write(data.data(), static_cast<buf_size>(pipe_buf)),
-               cxx11::io_exception);
+  EXPECT_CALLBACK_ERROR(stream.write(data.data(), static_cast<buf_size>(pipe_buf)),
+                        C11_E_IO);
   EXPECT_EQ(stream.write(data.data(), 0), 0);
 }
 
@@ -260,7 +266,7 @@ TEST(CFileStream, StreambufPropagatesReadError) {
   cxx11::basic_streambuf buffer(stream, 4);
   std::istream input(&buffer);
   input.exceptions(std::ios_base::badbit);
-  EXPECT_THROW(input.get(), cxx11::io_exception);
+  EXPECT_CALLBACK_ERROR(input.get(), C11_E_IO);
   EXPECT_TRUE(input.bad());
 }
 
@@ -274,20 +280,20 @@ TEST(CFileStream, WriteAndFlushErrors) {
   byte value = 'x';
 
   ASSERT_EQ(stream.write(&value, 1), 1);
-  EXPECT_THROW(stream.flush(), cxx11::io_exception);
+  EXPECT_CALLBACK_ERROR(stream.flush(), C11_E_IO);
   EXPECT_TRUE(std::ferror(file.get()));
   std::unique_ptr<FILE, file_deleter> unbuffered(std::fopen("/dev/full", "wb"));
   ASSERT_NE(unbuffered.get(), nullptr);
   ASSERT_EQ(std::setvbuf(unbuffered.get(), nullptr, _IONBF, 0), 0);
   cxx11::cfile_stream unbuffered_stream(unbuffered.get());
-  EXPECT_THROW(unbuffered_stream.write(&value, 1), cxx11::io_exception);
+  EXPECT_CALLBACK_ERROR(unbuffered_stream.write(&value, 1), C11_E_IO);
 
   std::unique_ptr<FILE, file_deleter> truncate_file(
       std::fopen("/dev/full", "wb"));
   ASSERT_NE(truncate_file.get(), nullptr);
   cxx11::cfile_stream truncate_stream(truncate_file.get());
   ASSERT_EQ(truncate_stream.write(&value, 1), 1);
-  EXPECT_THROW(truncate_stream.trunc(0), cxx11::io_exception);
+  EXPECT_CALLBACK_ERROR(truncate_stream.trunc(0), C11_E_IO);
 }
 #endif
 #endif

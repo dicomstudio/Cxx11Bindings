@@ -5,6 +5,7 @@
 #include <cstdio>
 #include <cstring>
 #include <fstream>  // std::filebuf
+#include <functional>
 #include <gtest/gtest.h>
 #include <limits>
 #include <sstream>
@@ -188,8 +189,11 @@ TEST(FilebufStreamDestroy, ReportsOwnedFileCloseFailure) {
 }
 #endif
 
-TEST(ErrorMapping, ExtendedCallbackErrorsRetainTheirCodes) {
+TEST(ErrorMapping, CallbackErrorsRetainTheirCodes) {
   const cxx11::ErrorCode codes[] = {
+      cxx11::ErrorCode::NullPointer, cxx11::ErrorCode::NotSupported,
+      cxx11::ErrorCode::InvalidArgument, cxx11::ErrorCode::ArgumentOutOfRange,
+      cxx11::ErrorCode::ObjectDisposed, cxx11::ErrorCode::IOException,
       cxx11::ErrorCode::InvalidOperation, cxx11::ErrorCode::Unauthorized,
       cxx11::ErrorCode::OutOfMemory, cxx11::ErrorCode::Timeout,
       cxx11::ErrorCode::Canceled, cxx11::ErrorCode::FileNotFound,
@@ -199,11 +203,61 @@ TEST(ErrorMapping, ExtendedCallbackErrorsRetainTheirCodes) {
   for (const auto code : codes) {
     try {
       cxx11::throw_exception_from_negative_value(static_cast<int>(code));
-      FAIL() << "Expected callback exception";
-    } catch (const cxx11::callback_exception& ex) {
+      FAIL() << "Expected stream exception";
+    } catch (const cxx11::stream_exception& ex) {
       EXPECT_EQ(ex.code(), code);
+      EXPECT_EQ(ex.raw_code(), static_cast<int>(code));
+      EXPECT_NE(std::string(ex.what()).find(std::to_string(static_cast<int>(code))),
+                std::string::npos);
     }
   }
+}
+
+TEST(ErrorMapping, UnknownNegativeValuesPreserveFullWidth) {
+  const int64_t codes[] = {-1, -2147483649LL, INT64_MIN};
+  for (const int64_t code : codes) {
+    try {
+      cxx11::throw_exception_from_negative_value(code);
+      FAIL() << "Expected stream exception";
+    } catch (const cxx11::stream_exception& ex) {
+      EXPECT_EQ(ex.code(), cxx11::ErrorCode::Unmapped);
+      EXPECT_EQ(ex.raw_code(), code);
+      EXPECT_NE(std::string(ex.what()).find(std::to_string(code)),
+                std::string::npos);
+    }
+  }
+  EXPECT_NO_THROW(cxx11::throw_exception_from_negative_value(0));
+  EXPECT_NO_THROW(cxx11::throw_exception_from_negative_value(INT64_MAX));
+}
+
+namespace {
+buf_size fail_read(c11_stream*, byte*, buf_size) { return C11_E_IO; }
+buf_size fail_write(c11_stream*, const byte*, buf_size) { return -1; }
+stream_offset fail_seek(c11_stream*, stream_offset, seek_dir) {
+  return -2147483649LL;
+}
+int fail_flush(c11_stream*) { return C11_E_UNAUTHORIZED; }
+stream_length fail_trunc(c11_stream*, stream_length) { return INT64_MIN; }
+}
+
+TEST(ErrorMapping, CStreamPropagatesAllCallbackFailures) {
+  c11_stream callbacks = {fail_read, fail_write, fail_seek, fail_flush,
+                          fail_trunc};
+  cxx11::c_stream stream(&callbacks);
+  byte value = 0;
+  const auto verify = [](const std::function<void()>& operation, int64_t code) {
+    try {
+      operation();
+      ADD_FAILURE() << "Expected stream_exception";
+    } catch (const cxx11::stream_exception& ex) {
+      EXPECT_EQ(ex.raw_code(), code);
+    }
+  };
+  verify([&] { stream.read(&value, 1); }, C11_E_IO);
+  verify([&] { stream.write(&value, 1); }, -1);
+  verify([&] { stream.seek(0, seek_beg); }, -2147483649LL);
+  verify([&] { stream.flush(); }, C11_E_UNAUTHORIZED);
+  verify([&] { stream.trunc(0); }, INT64_MIN);
 }
 
 class short_write_streambuf : public std::streambuf {
@@ -252,7 +306,8 @@ class partial_stream : public cxx11::stream_interface {
   buf_size read(byte*, buf_size) override { return 0; }
   buf_size write(const byte* data, buf_size count) override {
     ++calls;
-    if (calls == 2 && fail) throw cxx11::io_exception();
+    if (calls == 2 && fail)
+      throw cxx11::stream_exception(cxx11::ErrorCode::IOException);
     if (calls == 2 && stall) return 0;
     const buf_size n = std::min<buf_size>(count, 2);
     written.append(reinterpret_cast<const char*>(data), n);
@@ -282,7 +337,8 @@ class memory_stream : public cxx11::stream_interface {
 
   buf_size read(byte* buffer, buf_size count) override {
     ++read_calls;
-    if (throw_on_read) throw cxx11::io_exception();
+    if (throw_on_read)
+      throw cxx11::stream_exception(cxx11::ErrorCode::IOException);
     if (count <= 0 || position < 0 ||
         static_cast<std::size_t>(position) >= input.size()) {
       return 0;
@@ -308,7 +364,8 @@ class memory_stream : public cxx11::stream_interface {
     ++seek_calls;
     last_seek_offset = off;
     last_seek_direction = direction;
-    if (throw_on_seek) throw cxx11::io_exception();
+    if (throw_on_seek)
+      throw cxx11::stream_exception(cxx11::ErrorCode::IOException);
     if (fail_seek) return -1;
 
     stream_offset base = 0;
@@ -350,7 +407,7 @@ TEST(DefaultStreamBuf, PropagatesReadException) {
   target.throw_on_read = true;
   cxx11::basic_streambuf buffer(target);
 
-  EXPECT_THROW(buffer.sgetc(), cxx11::io_exception);
+  EXPECT_THROW(buffer.sgetc(), cxx11::stream_exception);
 }
 
 TEST(DefaultStreamBuf, PreservesPutbackCharactersAcrossRefill) {
@@ -475,7 +532,7 @@ TEST(DefaultStreamBuf, PropagatesSeekException) {
   cxx11::basic_streambuf buffer(target);
 
   EXPECT_THROW(buffer.pubseekoff(0, std::ios_base::beg, std::ios_base::in),
-               cxx11::io_exception);
+               cxx11::stream_exception);
 }
 
 TEST(DefaultStreamBuf, DestructorFlushesPendingOutput) {
@@ -514,7 +571,7 @@ TEST(ShortWrite, BufferedStreamRetainsOnlyUnwrittenBytesAfterException) {
   target.fail = true;
   cxx11::basic_streambuf buffer(target);
   ASSERT_EQ(buffer.sputn("abcde", 5), 5);
-  EXPECT_THROW(buffer.pubsync(), cxx11::io_exception);
+  EXPECT_THROW(buffer.pubsync(), cxx11::stream_exception);
   EXPECT_EQ(target.written, "ab");
   EXPECT_EQ(buffer.pubsync(), 0);
   EXPECT_EQ(target.written, "abcde");

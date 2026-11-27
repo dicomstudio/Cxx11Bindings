@@ -9,6 +9,7 @@
 #include <cstring>  // memmove
 #include <stdexcept>
 #include <streambuf>
+#include <string>
 #include <vector>
 
 namespace cxx11 {
@@ -52,93 +53,38 @@ enum class ErrorCode : int {
   Unmapped = C11_E_UNMAPPED
 };
 
-// Custom exception class
-class null_pointer final : public std::exception {
+// code() classifies unknown values as Unmapped; raw_code() preserves them.
+class stream_exception final : public std::runtime_error {
  public:
-  const char* what() const noexcept override {
-    return "Attempted to dereference a null pointer.";
+  explicit stream_exception(ErrorCode code)
+      : stream_exception(static_cast<int64_t>(code)) {}
+
+  explicit stream_exception(int64_t code)
+      : std::runtime_error("C11 stream error code " +
+                           std::to_string(code)),
+        code_(code) {}
+
+  ErrorCode code() const noexcept {
+    if (code_ >= static_cast<int64_t>(C11_E_POINTER) &&
+        code_ <= static_cast<int64_t>(C11_E_UNMAPPED)) {
+      return static_cast<ErrorCode>(code_);
+    }
+    return ErrorCode::Unmapped;
   }
-
-  null_pointer() = default;
-};
-
-class not_supported final : public std::runtime_error {
- public:
-  explicit not_supported(const std::string& message = "Function not supported")
-      : std::runtime_error(message) {}
-};
-
-class invalid_argument final : public std::runtime_error {
- public:
-  explicit invalid_argument(const std::string& message = "Argument error")
-      : std::runtime_error(message) {}
-};
-
-class argument_out_of_range final : public std::runtime_error {
- public:
-  explicit argument_out_of_range(
-      const std::string& message = "Argument Out Of Range")
-      : std::runtime_error(message) {}
-};
-
-class object_disposed final : public std::runtime_error {
- public:
-  explicit object_disposed(const std::string& message = "Object Disposed")
-      : std::runtime_error(message) {}
-};
-
-class io_exception final : public std::runtime_error {
- public:
-  explicit io_exception(const std::string& message = "io exception")
-      : std::runtime_error(message) {}
-};
-
-class callback_exception final : public std::runtime_error {
- public:
-  explicit callback_exception(ErrorCode code)
-      : std::runtime_error("C11 callback failed"), code_(code) {}
-  ErrorCode code() const noexcept { return code_; }
+  int64_t raw_code() const noexcept { return code_; }
 
  private:
-  ErrorCode code_;
+  int64_t code_;
 };
 
 static inline void throw_exception_from_enum(const ErrorCode err_code) {
-  switch (err_code) {
-    case ErrorCode::NullPointer:
-      throw null_pointer();
-    case ErrorCode::NotSupported:
-      throw not_supported();
-    case ErrorCode::InvalidArgument:
-      throw invalid_argument();
-    case ErrorCode::ArgumentOutOfRange:
-      throw argument_out_of_range();
-    case ErrorCode::ObjectDisposed:
-      throw object_disposed();
-    case ErrorCode::IOException:
-      throw io_exception();
-    case ErrorCode::InvalidOperation:
-    case ErrorCode::Unauthorized:
-    case ErrorCode::OutOfMemory:
-    case ErrorCode::Timeout:
-    case ErrorCode::Canceled:
-    case ErrorCode::FileNotFound:
-    case ErrorCode::DirectoryNotFound:
-    case ErrorCode::PathTooLong:
-    case ErrorCode::EndOfStream:
-    case ErrorCode::ArgumentNull:
-    case ErrorCode::NotImplemented:
-    case ErrorCode::Unmapped:
-      throw callback_exception(err_code);
-  }
-  assert(0);
+  throw stream_exception(err_code);
 }
 
 template <typename T>
 static inline void throw_exception_from_negative_value(T value) {
-  // FIXME: check int32
   if (value < 0) {
-    throw_exception_from_enum(static_cast<ErrorCode>(value));
+    throw stream_exception(static_cast<int64_t>(value));
   }
 }
 
