@@ -127,6 +127,7 @@ jobs:
       run: >
         cmake -S googletest -B googletest-build -G "Unix Makefiles"
         -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX="$PWD/gtest-install"
+        -DCMAKE_MAKE_PROGRAM=/usr/bin/make
         -DBUILD_GMOCK=OFF
 
     - name: Build and install Google Test
@@ -138,6 +139,7 @@ jobs:
       run: >
         cmake -S . -B build-cygwin -G "Unix Makefiles"
         -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH="$PWD/gtest-install"
+        -DCMAKE_MAKE_PROGRAM=/usr/bin/make
 
     - name: Build
       shell: bash --noprofile --norc -eo pipefail -o igncr '{0}'
