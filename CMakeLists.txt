@@ -201,6 +201,12 @@ if(BUILD_TESTING)
                                PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
     target_compile_definitions(${PROJECT_NAME}_filebuf_alloc_failure_tests
                                PRIVATE CXX11_BINDINGS_BUILD)
+    if(NOT WIN32)
+      target_compile_definitions(${PROJECT_NAME}_filebuf_alloc_failure_tests
+                                 PRIVATE _FILE_OFFSET_BITS=64
+                                         _LARGEFILE64_SOURCE
+                                         _POSIX_C_SOURCE=200112L)
+    endif()
     add_test(NAME FilebufStreamAllocationFailure
              COMMAND ${PROJECT_NAME}_filebuf_alloc_failure_tests)
   endif()
