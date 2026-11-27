@@ -326,6 +326,8 @@ class memory_stream : public cxx11::stream_interface {
   buf_size max_read = (std::numeric_limits<buf_size>::max)();
   buf_size max_write = (std::numeric_limits<buf_size>::max)();
   bool throw_on_read = false;
+  buf_size read_error = 0;
+  bool overreport_read = false;
   bool overreport_write = false;
   bool fail_seek = false;
   bool throw_on_seek = false;
@@ -340,6 +342,8 @@ class memory_stream : public cxx11::stream_interface {
     ++read_calls;
     if (throw_on_read)
       throw cxx11::stream_exception(cxx11::ErrorCode::IOException);
+    if (read_error < 0) return read_error;
+    if (overreport_read) return count + 1;
     if (count <= 0 || position < 0 ||
         static_cast<std::size_t>(position) >= input.size()) {
       return 0;
@@ -435,6 +439,32 @@ TEST(DefaultStreamBuf, PropagatesReadException) {
   cxx11::basic_streambuf buffer(target);
 
   EXPECT_THROW(buffer.sgetc(), cxx11::stream_exception);
+}
+
+TEST(DefaultStreamBuf, RejectsInvalidReadCountsAndCanRetry) {
+  for (const bool overreport : {false, true}) {
+    memory_stream target;
+    target.input = "abcd";
+    cxx11::basic_streambuf buffer(target, 2);
+    ASSERT_EQ(buffer.sbumpc(), 'a');
+    ASSERT_EQ(buffer.sbumpc(), 'b');
+    target.overreport_read = overreport;
+    target.read_error = overreport ? 0 : C11_E_IO;
+
+    try {
+      buffer.sgetc();
+      FAIL() << "invalid read result did not throw";
+    } catch (const cxx11::stream_exception& error) {
+      EXPECT_EQ(error.raw_code(), overreport ? C11_E_INVALIDOPERATION : C11_E_IO);
+    }
+    EXPECT_EQ(buffer.sungetc(), 'b');
+    EXPECT_EQ(buffer.sbumpc(), 'b');
+    target.overreport_read = false;
+    target.read_error = 0;
+    EXPECT_EQ(buffer.sbumpc(), 'c');
+    EXPECT_EQ(buffer.sbumpc(), 'd');
+    EXPECT_EQ(buffer.sgetc(), std::char_traits<char>::eof());
+  }
 }
 
 TEST(DefaultStreamBuf, PreservesPutbackCharactersAcrossRefill) {
