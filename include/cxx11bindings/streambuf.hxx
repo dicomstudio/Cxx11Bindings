@@ -146,10 +146,12 @@ class basic_streambuf final : public std::streambuf {
   // callback and pointer ranges; invalid sizes throw before allocating.
   explicit basic_streambuf(stream_interface& f,
                            const std::size_t buff_sz = 4096)
-      : stream_(f), buffer_(checked_buffer_size(buff_sz)) {
-    char* base = buffer_.data();
-    setg(base + put_back_size, base + put_back_size, base + put_back_size);
-    setp(base, base + buffer_.size());
+      : stream_(f),
+        input_buffer_(checked_buffer_size(buff_sz)),
+        output_buffer_(input_buffer_.size()) {
+    char* input = input_buffer_.data();
+    setg(input + put_back_size, input + put_back_size, input + put_back_size);
+    setp(output_buffer_.data(), output_buffer_.data() + output_buffer_.size());
   }
 
   // Destruction is best-effort; call pubsync() explicitly to detect errors.
@@ -168,18 +170,18 @@ class basic_streambuf final : public std::streambuf {
     std::size_t putback = gptr() - eback();
     putback = std::min(putback, put_back_size);
 
-    std::memmove(buffer_.data() + (put_back_size - putback), gptr() - putback,
+    std::memmove(input_buffer_.data() + (put_back_size - putback), gptr() - putback,
                  putback);
-    setg(buffer_.data() + (put_back_size - putback),
-         buffer_.data() + put_back_size, buffer_.data() + put_back_size);
+    setg(input_buffer_.data() + (put_back_size - putback),
+         input_buffer_.data() + put_back_size, input_buffer_.data() + put_back_size);
 
     // ->read() call may throw, but this is legitimate behavior:
     // https://developercommunity.visualstudio.com/t/Exception-from-streambuf-should-be-caugh/10555755
     // https://stackoverflow.com/a/77704741/136285
     // https://github.com/microsoft/STL/issues/4322
-    const buf_size count = static_cast<buf_size>(buffer_.size() - put_back_size);
+    const buf_size count = static_cast<buf_size>(input_buffer_.size() - put_back_size);
     const buf_size n = stream_.read(
-        reinterpret_cast<byte*>(buffer_.data() + put_back_size), count);
+        reinterpret_cast<byte*>(input_buffer_.data() + put_back_size), count);
     throw_exception_from_negative_value(n);
     if (n > count) {
       throw stream_exception(ErrorCode::InvalidOperation);
@@ -188,8 +190,8 @@ class basic_streambuf final : public std::streambuf {
       return traits_type::eof();
     }
 
-    setg(buffer_.data() + (put_back_size - putback),
-         buffer_.data() + put_back_size, buffer_.data() + put_back_size + n);
+    setg(input_buffer_.data() + (put_back_size - putback),
+         input_buffer_.data() + put_back_size, input_buffer_.data() + put_back_size + n);
 
     return traits_type::to_int_type(*gptr());
   }
@@ -247,11 +249,11 @@ class basic_streambuf final : public std::streambuf {
     }
 
     // A failed or throwing seek may still change the underlying position.
-    setg(buffer_.data() + put_back_size, buffer_.data() + put_back_size,
-         buffer_.data() + put_back_size);
+    setg(input_buffer_.data() + put_back_size, input_buffer_.data() + put_back_size,
+         input_buffer_.data() + put_back_size);
     const stream_offset pos = stream_.seek(off, origin);
 
-    setp(buffer_.data(), buffer_.data() + buffer_.size());
+    setp(output_buffer_.data(), output_buffer_.data() + output_buffer_.size());
 
     if (pos < 0) {
       return {-1};
@@ -281,7 +283,8 @@ class basic_streambuf final : public std::streambuf {
   }
 
   stream_interface& stream_;
-  std::vector<char> buffer_;
+  std::vector<char> input_buffer_;
+  std::vector<char> output_buffer_;
 
   int flush_buffer() {
     while (pptr() != pbase()) {

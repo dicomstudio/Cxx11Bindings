@@ -22,6 +22,8 @@ for its putback space and callback counts. Zero throws `std::invalid_argument`;
 sizes exceeding the supported range throw `std::length_error` before allocation.
 `basic_streambuf` throws `stream_exception` for a negative read result and
 uses `InvalidOperation` when a read reports more bytes than requested.
+Input and output use separate buffers. Callers must still coordinate direction
+changes as required by the underlying stream's positioning rules.
 `pubsync()` writes buffered output and then flushes the underlying stream;
 check its return value or handle exceptions to detect failures. Its destructor
 attempts the same operation but cannot report failures and suppresses exceptions.
