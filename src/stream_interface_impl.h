@@ -61,7 +61,7 @@ static inline buf_size fwrite_file_fp(FILE* stream, const byte* buffer,
     return C11_E_INVALIDARG;
   }
   const size_t written = fwrite(buffer, 1, (size_t)count, stream);
-  if (written != (size_t)count) {
+  if (written == 0 && count > 0 && ferror(stream)) {
     return C11_E_IO;
   }
   return (buf_size)written;
@@ -239,7 +239,7 @@ static inline buf_size write_fd(int fileno, const byte* buffer,
     return C11_E_INVALIDARG;
   }
   const ssize_t written = write(fileno, buffer, (size_t)count);
-  if (written != (ssize_t)count) {
+  if (written < 0) {
     return C11_E_IO;
   }
   return (buf_size)written;

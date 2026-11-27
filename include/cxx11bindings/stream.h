@@ -68,6 +68,8 @@ struct c11_stream;
 // all return types are signed to allow error codes to be returned
 typedef buf_size (*read_fn)(struct c11_stream* self, byte* buffer,
                             buf_size count);
+// Return the number of bytes written (0..count), or a negative error if no
+// bytes were written. A short write may include progress made before an error.
 typedef buf_size (*write_fn)(struct c11_stream* self, const byte* buffer,
                              buf_size count);
 typedef stream_offset (*seek_fn)(struct c11_stream* self, stream_offset off,

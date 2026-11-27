@@ -41,9 +41,6 @@ static buf_size file_write(c11_stream* self, const byte* buffer,
   std::streambuf* file = fs->file;
   const buf_size written = static_cast<buf_size>(
       file->sputn(reinterpret_cast<const char*>(buffer), count));
-  if (written != count) {
-    return C11_E_IO;
-  }
   return written;
 }
 

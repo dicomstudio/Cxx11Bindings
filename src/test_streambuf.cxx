@@ -1,8 +1,98 @@
 #include "stream_interface_impl.hxx"
 
+#include <cxx11bindings/filebuf.hxx>
 #include <fstream>  // std::filebuf
 #include <gtest/gtest.h>
 #include <sstream>
+
+class short_write_streambuf : public std::streambuf {
+ public:
+  explicit short_write_streambuf(std::streamsize limit) : limit_(limit) {}
+  std::string written;
+
+ protected:
+  std::streamsize xsputn(const char* data, std::streamsize count) override {
+    const std::streamsize n = (std::min)(count, limit_);
+    written.append(data, static_cast<std::size_t>(n));
+    return n;
+  }
+
+ private:
+  std::streamsize limit_;
+};
+
+TEST(ShortWrite, StreambufAdapterReturnsProgress) {
+  short_write_streambuf target(2);
+  c11_stream* stream = nullptr;
+  ASSERT_EQ(cxx11_file_stream_init(&stream, &target), 0);
+  const byte data[] = {'a', 'b', 'c', 'd'};
+  EXPECT_EQ(c11_stream_write(stream, data, 4), 2);
+  EXPECT_EQ(target.written, "ab");
+  EXPECT_EQ(cxx11_file_stream_destroy(stream), 0);
+}
+
+TEST(ShortWrite, StreambufAdapterReturnsZeroWithoutProgress) {
+  short_write_streambuf target(0);
+  c11_stream* stream = nullptr;
+  ASSERT_EQ(cxx11_file_stream_init(&stream, &target), 0);
+  const byte data[] = {'a'};
+  EXPECT_EQ(c11_stream_write(stream, data, 1), 0);
+  EXPECT_TRUE(target.written.empty());
+  EXPECT_EQ(cxx11_file_stream_destroy(stream), 0);
+}
+
+class partial_stream : public cxx11::stream_interface {
+ public:
+  std::string written;
+  int calls = 0;
+  bool stall = false;
+  bool fail = false;
+
+  buf_size read(byte*, buf_size) override { return 0; }
+  buf_size write(const byte* data, buf_size count) override {
+    ++calls;
+    if (calls == 2 && fail) throw cxx11::io_exception();
+    if (calls == 2 && stall) return 0;
+    const buf_size n = std::min<buf_size>(count, 2);
+    written.append(reinterpret_cast<const char*>(data), n);
+    return n;
+  }
+  stream_offset seek(stream_offset, seek_dir) override { return 0; }
+  int flush() override { return 0; }
+  stream_length trunc(stream_length size) override { return size; }
+};
+
+TEST(ShortWrite, BufferedStreamRetriesPartialProgress) {
+  partial_stream target;
+  cxx11::basic_streambuf buffer(target);
+  ASSERT_EQ(buffer.sputn("abcde", 5), 5);
+  EXPECT_EQ(buffer.pubsync(), 0);
+  EXPECT_EQ(target.written, "abcde");
+  EXPECT_EQ(target.calls, 3);
+}
+
+TEST(ShortWrite, BufferedStreamRetainsOnlyUnwrittenBytesAfterStall) {
+  partial_stream target;
+  target.stall = true;
+  cxx11::basic_streambuf buffer(target);
+  ASSERT_EQ(buffer.sputn("abcde", 5), 5);
+  EXPECT_EQ(buffer.pubsync(), -1);
+  EXPECT_EQ(target.written, "ab");
+  EXPECT_EQ(target.calls, 2);
+  EXPECT_EQ(buffer.pubsync(), 0);
+  EXPECT_EQ(target.written, "abcde");
+}
+
+TEST(ShortWrite, BufferedStreamRetainsOnlyUnwrittenBytesAfterException) {
+  partial_stream target;
+  target.fail = true;
+  cxx11::basic_streambuf buffer(target);
+  ASSERT_EQ(buffer.sputn("abcde", 5), 5);
+  EXPECT_THROW(buffer.pubsync(), cxx11::io_exception);
+  EXPECT_EQ(target.written, "ab");
+  EXPECT_EQ(buffer.pubsync(), 0);
+  EXPECT_EQ(target.written, "abcde");
+}
 
 TEST(FileBufComparison, WriteAndRead) {
   auto filename = "testfile.txt";
