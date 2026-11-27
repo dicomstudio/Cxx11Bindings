@@ -31,6 +31,13 @@ typedef int (*flush_fn)(struct c11_stream* self);
 typedef int64_t (*trunc_fn)(struct c11_stream* self, int64_t size);
 ```
 
+The C++ `cxx11::c_stream` adapter throws `cxx11::stream_exception` for any
+negative callback result. `code()` identifies known `ErrorCode` values and
+returns `ErrorCode::Unmapped` for unknown values; `raw_code()` retains the
+original signed 64-bit result, and `what()` includes it. Callers migrating from
+the former individual exception types should catch `stream_exception` and
+inspect its code instead.
+
 ## See:
 
 * https://learn.microsoft.com/en-us/cpp/build/walkthrough-using-msbuild-to-create-a-visual-cpp-project?view=msvc-170

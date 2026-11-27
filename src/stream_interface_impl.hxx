@@ -15,7 +15,7 @@ class handle_stream final : public stream_interface {
  public:
   explicit handle_stream(const HANDLE handle) : handle_(handle) {
     if (handle == INVALID_HANDLE_VALUE) {
-      throw invalid_argument();
+      throw stream_exception(ErrorCode::InvalidArgument);
     }
   }
 
@@ -59,7 +59,7 @@ class fd_stream final : public stream_interface {
  public:
   explicit fd_stream(int fd) : fd_(fd) {
     if (fd < 0) {
-      throw invalid_argument();
+      throw stream_exception(ErrorCode::InvalidArgument);
     }
   }
 
@@ -103,7 +103,7 @@ class cfile_stream final : public stream_interface {
  public:
   explicit cfile_stream(FILE* stream) : stream_(stream) {
     if (!stream) {
-      throw null_pointer();
+      throw stream_exception(ErrorCode::NullPointer);
     }
   }
 
@@ -195,7 +195,9 @@ class stream_streambuf final : public stream_interface {
 
   int flush() override { return stream_->pubsync(); }
 
-  stream_length trunc(stream_length) override { throw not_supported(); }
+  stream_length trunc(stream_length) override {
+    throw stream_exception(ErrorCode::NotSupported);
+  }
 
  private:
   std::streambuf* stream_;
