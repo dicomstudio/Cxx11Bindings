@@ -242,6 +242,9 @@ int cxx11_file_stream_destroy(c11_stream* self) {
 }
 
 int cxx11_file_stream_init(c11_stream** p_self, std::streambuf* sb) {
+  if (!p_self) return C11_E_POINTER;
+  *p_self = nullptr;
+  if (!sb) return C11_E_INVALIDARG;
   return file_stream_init(p_self, sb, false);
 }
 

@@ -54,11 +54,13 @@ CXX11_BINDINGS_EXPORT int cxx11_file_stream_create2(c11_stream** p_self,
 CXX11_BINDINGS_EXPORT int cxx11_file_stream_destroy(c11_stream* self);
 
 /**
- * Initialize a cxx11_file_stream from an existing std::streambuf& stream.
- * The std::streambuf& stream is not deleted when the c11_stream is destroyed.
- * @param self
- * @param streambuf
- * @return
+ * Initialize a cxx11_file_stream from an existing std::streambuf.
+ * The streambuf is not deleted when the c11_stream is destroyed.
+ * On failure, *p_self is set to null when p_self is non-null.
+ * @param p_self Output stream pointer.
+ * @param sb Non-null borrowed streambuf.
+ * @return 0 on success, C11_E_POINTER if p_self is null,
+ * C11_E_INVALIDARG if sb is null, or C11_E_OUTOFMEMORY on allocation failure.
  */
 CXX11_BINDINGS_EXPORT int cxx11_file_stream_init(c11_stream** p_self,
                                                  std::streambuf* sb);
