@@ -75,6 +75,8 @@ set_target_properties(${LIBRARY_NAME}_common
                       PROPERTIES POSITION_INDEPENDENT_CODE ON)
 target_include_directories(${LIBRARY_NAME}_common
                            PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
+target_compile_definitions(${LIBRARY_NAME}_common
+                           PRIVATE CXX11_BINDINGS_BUILD)
 if(C11B_BUILD_FILE OR C11B_BUILD_FILEBUF)
   # add_library(${LIBRARY_NAME} SHARED ${SOURCES})
   add_library(${LIBRARY_NAME} SHARED $<TARGET_OBJECTS:${LIBRARY_NAME}_common>)
@@ -101,6 +103,8 @@ endif()
 # module library (e.g., plugin for dlopen) ----
 add_library(${LIBRARY_NAME}_module MODULE
             $<TARGET_OBJECTS:${LIBRARY_NAME}_common> src/test_cxx11bindings.c)
+target_compile_definitions(${LIBRARY_NAME}_module
+                           PRIVATE CXX11_BINDINGS_BUILD)
 target_include_directories(${LIBRARY_NAME}_module
                            PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
 set_target_properties(
@@ -175,6 +179,8 @@ if(BUILD_TESTING)
     include(GoogleTest)
     add_executable(${PROJECT_NAME}_tests src/test_streambuf.cxx
                                          src/test_cfile.cxx)
+    target_compile_definitions(${PROJECT_NAME}_tests
+                               PRIVATE _POSIX_C_SOURCE=200112L)
     target_link_libraries(${LIBRARY_NAME}_tests PRIVATE ${LIBRARY_NAME})
     if(MSVC)
       target_compile_definitions(${PROJECT_NAME}_tests

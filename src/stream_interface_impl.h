@@ -299,7 +299,11 @@ static inline int64_t lseek_fd(int fileno, const int64_t offset,
     default:
       return C11_E_INVALIDARG;
   }
+#ifdef __CYGWIN__
+  const off_t ret = lseek(fileno, offset, whence);
+#else
   const off64_t ret = lseek64(fileno, offset, whence);
+#endif
   if (ret < 0) {
     if (errno == EINVAL) {
       // Invalid offset or whence
