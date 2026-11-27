@@ -88,6 +88,8 @@ enum error_codes {
 struct c11_stream;
 // function declaration for stream interface
 // all return types are signed to allow error codes to be returned
+// Return the number of bytes read (0..count), or a negative error if no
+// bytes were read. A short read may include progress made before an error.
 typedef buf_size (*read_fn)(struct c11_stream* self, byte* buffer,
                             buf_size count);
 // Return the number of bytes written (0..count), or a negative error if no
