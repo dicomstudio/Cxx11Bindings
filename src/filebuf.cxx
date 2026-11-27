@@ -1,7 +1,7 @@
 #include <cxx11bindings/filebuf.hxx>
 
 #include "stream_interface_impl.h"
-#ifndef _MSC_VER
+#ifndef _WIN32
 #include <climits>
 #include <codecvt>
 #include <locale>
@@ -9,7 +9,7 @@
 #include <fstream>
 #include <memory>
 #include <new>
-#ifdef _MSC_VER
+#ifdef _WIN32
 #include <windows.h>
 #endif
 
@@ -129,7 +129,20 @@ int cxx11_file_stream_create1(c11_stream** p_self, const char* filename,
     try {
       const std::ios::openmode open_mode = file_mode_to_ios_flags(mode);
       std::unique_ptr<std::filebuf> fb(new std::filebuf());
+#ifdef _WIN32
+      const int length =
+          MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, filename, -1,
+                              nullptr, 0);
+      if (length == 0) return C11_E_INVALIDARG;
+      std::wstring wide_filename(static_cast<std::size_t>(length), L'\0');
+      if (MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, filename, -1,
+                              &wide_filename[0], length) == 0) {
+        return C11_E_INVALIDARG;
+      }
+      fb->open(wide_filename.c_str(), open_mode);
+#else
       fb->open(filename, open_mode);
+#endif
       if (fb->is_open()) {
         const int ret = file_stream_init(p_self, fb.get(), true);
         if (ret == 0) fb.release();
@@ -146,7 +159,7 @@ int cxx11_file_stream_create1(c11_stream** p_self, const char* filename,
   return C11_E_INVALIDARG;
 }
 
-#ifdef _MSC_VER
+#ifdef _WIN32
 namespace {
 // Converts wchar_t* to char* (ASCII). Returns true on success.
 bool wchar_to_ascii(const wchar_t* wstr, char* str, const int str_size) {
@@ -163,14 +176,13 @@ int cxx11_file_stream_create2(c11_stream** p_self, const wchar_t* wfilename,
   if (wfilename && wmode) {
     try {
       std::unique_ptr<std::filebuf> fb(new std::filebuf());
-#ifdef _MSC_VER
+#ifdef _WIN32
       char mode[16];
       if (wchar_to_ascii(wmode, mode, sizeof mode)) {
         const std::ios::openmode open_mode = file_mode_to_ios_flags(mode);
         fb->open(wfilename, open_mode);
       }
-#endif
-#ifndef _MSC_VER
+#else
 #if WCHAR_MAX <= 0xffff
       std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>> converter;
 #else

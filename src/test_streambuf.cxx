@@ -42,6 +42,37 @@ TEST(FilebufStreamCreate, RejectsNullOutput) {
   EXPECT_EQ(cxx11_file_stream_create2(nullptr, nullptr, nullptr), C11_E_POINTER);
 }
 
+TEST(FilebufStreamCreate, OpensUtf8FilenameForWritingAndReading) {
+  const char* filename = "filebuf_utf8_\xc3\xa9_\xf0\x9f\x98\x80.tmp";
+  c11_stream* stream = nullptr;
+  ASSERT_EQ(cxx11_file_stream_create1(&stream, filename, "wb"), 0);
+  const byte data[] = {'u', 0, '8'};
+  EXPECT_EQ(c11_stream_write(stream, data, sizeof data), sizeof data);
+  EXPECT_EQ(cxx11_file_stream_destroy(stream), 0);
+
+  stream = nullptr;
+  ASSERT_EQ(cxx11_file_stream_create1(&stream, filename, "rb"), 0);
+  byte readback[sizeof data] = {};
+  EXPECT_EQ(c11_stream_read(stream, readback, sizeof readback), sizeof data);
+  EXPECT_EQ(std::memcmp(readback, data, sizeof data), 0);
+  EXPECT_EQ(cxx11_file_stream_destroy(stream), 0);
+#ifdef _WIN32
+  EXPECT_EQ(_wremove(L"filebuf_utf8_\u00e9_\U0001f600.tmp"), 0);
+#else
+  EXPECT_EQ(std::remove(filename), 0);
+#endif
+}
+
+#ifdef _WIN32
+TEST(FilebufStreamCreate, RejectsInvalidUtf8Filename) {
+  c11_stream sentinel = {};
+  c11_stream* stream = &sentinel;
+  EXPECT_EQ(cxx11_file_stream_create1(&stream, "\xc3\x28", "wb"),
+            C11_E_INVALIDARG);
+  EXPECT_EQ(stream, nullptr);
+}
+#endif
+
 TEST(FilebufStreamCreate, OpensWideFilenameForWritingAndReading) {
   const wchar_t* filename = L"filebuf_wide_\u00e9_\U0001f600.tmp";
   c11_stream* stream = nullptr;
@@ -63,7 +94,7 @@ TEST(FilebufStreamCreate, OpensWideFilenameForWritingAndReading) {
 #endif
 }
 
-#ifndef _MSC_VER
+#ifndef _WIN32
 TEST(FilebufStreamCreate, RejectsInvalidWideFilename) {
   const wchar_t invalid[] = {static_cast<wchar_t>(0xd800), 0};
   c11_stream sentinel = {};
