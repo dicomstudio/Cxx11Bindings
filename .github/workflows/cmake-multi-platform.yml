@@ -100,3 +100,53 @@ jobs:
 
     - name: CMake Install
       run: cmake --install ${{ steps.strings.outputs.build-output-dir }} --prefix local --config ${{ matrix.build_type }}
+
+  cygwin:
+    runs-on: windows-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Check out Google Test
+      uses: actions/checkout@v4
+      with:
+        repository: google/googletest
+        ref: v1.14.0
+        path: googletest
+
+    - name: Install Cygwin
+      uses: cygwin/cygwin-install-action@v7
+      with:
+        packages: >-
+          cmake
+          gcc-core
+          gcc-g++
+          make
+
+    - name: Configure Google Test
+      shell: bash --noprofile --norc -eo pipefail -o igncr '{0}'
+      run: >
+        cmake -S googletest -B googletest-build -G "Unix Makefiles"
+        -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX="$PWD/gtest-install"
+        -DBUILD_GMOCK=OFF
+
+    - name: Build and install Google Test
+      shell: bash --noprofile --norc -eo pipefail -o igncr '{0}'
+      run: cmake --build googletest-build && cmake --install googletest-build
+
+    - name: Configure CMake
+      shell: bash --noprofile --norc -eo pipefail -o igncr '{0}'
+      run: >
+        cmake -S . -B build-cygwin -G "Unix Makefiles"
+        -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH="$PWD/gtest-install"
+
+    - name: Build
+      shell: bash --noprofile --norc -eo pipefail -o igncr '{0}'
+      run: cmake --build build-cygwin
+
+    - name: Test
+      shell: bash --noprofile --norc -eo pipefail -o igncr '{0}'
+      run: ctest --test-dir build-cygwin --output-on-failure --no-tests=error
+
+    - name: CMake Install
+      shell: bash --noprofile --norc -eo pipefail -o igncr '{0}'
+      run: cmake --install build-cygwin --prefix "$PWD/local-cygwin"
