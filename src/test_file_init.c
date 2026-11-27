@@ -60,6 +60,8 @@ int main(void) {
 
 #ifdef _WIN32
   CHECK(c11_handle_stream_init(NULL, GetCurrentProcess()) == C11_E_POINTER);
+  CHECK(c11_handle_stream_init(&stream, INVALID_HANDLE_VALUE) ==
+        C11_E_INVALIDARG);
 #else
   CHECK(c11_fd_stream_init(NULL, 0) == C11_E_POINTER);
   CHECK(c11_fd_stream_init(&stream, -1) == C11_E_INVALIDARG);

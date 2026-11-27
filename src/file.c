@@ -225,7 +225,7 @@ static stream_length handle_trunc(struct c11_stream* self,
 
 static int handle_stream_init(struct c11_stream** p_self, const HANDLE handle,
                           const bool created) {
-  assert(handle!=NULL);
+  assert(handle != NULL && handle != INVALID_HANDLE_VALUE);
   struct handle_stream* self = malloc(sizeof(*self));
   if (self) {
     *p_self = &self->super;
@@ -246,7 +246,9 @@ static int handle_stream_init(struct c11_stream** p_self, const HANDLE handle,
 
 int c11_handle_stream_init(struct c11_stream** p_self, const HANDLE handle) {
   if (!p_self) return C11_E_POINTER;
-  if (handle != NULL) return handle_stream_init(p_self, handle, false);
+  if (handle != NULL && handle != INVALID_HANDLE_VALUE) {
+    return handle_stream_init(p_self, handle, false);
+  }
   return C11_E_INVALIDARG;
 }
 #else
