@@ -432,6 +432,34 @@ TEST(DefaultStreamBuf, ReadsWithMinimumBufferSize) {
   EXPECT_EQ(buffer.sgetc(), std::char_traits<char>::eof());
 }
 
+TEST(DefaultStreamBuf, ReadingDoesNotOverwritePendingOutput) {
+  memory_stream target;
+  target.input = "abcdefghijkl";
+  cxx11::basic_streambuf buffer(target, 4);
+  ASSERT_EQ(buffer.sputn("PENDING", 7), 7);
+  char result[10] = {};
+  ASSERT_EQ(buffer.sgetn(result, sizeof result), sizeof result);
+  EXPECT_EQ(std::string(result, sizeof result), "abcdefghij");
+  EXPECT_TRUE(target.output.empty());
+  EXPECT_EQ(buffer.pubsync(), 0);
+  EXPECT_EQ(target.output, "PENDING");
+}
+
+TEST(DefaultStreamBuf, WritingDoesNotOverwriteUnreadInputOrPutback) {
+  memory_stream target;
+  target.input = "abcdefgh";
+  cxx11::basic_streambuf buffer(target, 4);
+  ASSERT_EQ(buffer.sbumpc(), 'a');
+  ASSERT_EQ(buffer.sbumpc(), 'b');
+  ASSERT_EQ(buffer.sputn("PENDING-OUTPUT", 14), 14);
+  EXPECT_EQ(buffer.sungetc(), 'b');
+  char result[7] = {};
+  ASSERT_EQ(buffer.sgetn(result, sizeof result), sizeof result);
+  EXPECT_EQ(std::string(result, sizeof result), "bcdefgh");
+  EXPECT_EQ(buffer.pubsync(), 0);
+  EXPECT_EQ(target.output, "PENDING-OUTPUT");
+}
+
 TEST(DefaultStreamBuf, ReadsShortChunksAndReportsEndOfInput) {
   memory_stream target;
   target.input = "abcdefgh";
