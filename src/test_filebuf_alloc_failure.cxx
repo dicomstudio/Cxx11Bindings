@@ -92,7 +92,6 @@ int main() {
   CHECK(wide_result == C11_E_OUTOFMEMORY);
   CHECK(stream == nullptr);
 
-#ifdef _MSC_VER
   const wchar_t* wide_filename = L"filebuf_alloc_failure_wide_test.tmp";
   saw_failure = false;
   saw_success = false;
@@ -112,7 +111,10 @@ int main() {
     saw_failure = true;
   }
   CHECK(saw_failure && saw_success);
+#ifdef _WIN32
   CHECK(_wremove(wide_filename) == 0);
+#else
+  CHECK(std::remove("filebuf_alloc_failure_wide_test.tmp") == 0);
 #endif
   return 0;
 }
