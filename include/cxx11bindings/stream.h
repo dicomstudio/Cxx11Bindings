@@ -49,7 +49,7 @@ enum seek_dirs {
 // https://learn.microsoft.com/en-us/dotnet/framework/interop/how-to-map-hresults-and-exceptions
 enum error_codes {
   // NullReferenceException
-  C11_E_POINTER = (int)0x80000000,
+  C11_E_POINTER = -2147483647 - 1, // 0x80000000
   // NotSupportedException
   C11_E_NOTSUPPORTED,
   // ArgumentException
