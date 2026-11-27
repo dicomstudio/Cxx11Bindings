@@ -14,6 +14,7 @@ extern "C" {
  * Create and initialize a cxx11_file_stream from a file specified by filename
  * and mode. filename is expressed in UTF-8 encoding.
  * Append "b" to a supported mode (for example, "r+b") to use binary mode.
+ * On failure, *p_self is set to null when p_self is non-null.
  * @param p_self
  * @param filename
  * @param mode
@@ -27,6 +28,7 @@ CXX11_BINDINGS_EXPORT int cxx11_file_stream_create1(c11_stream** p_self,
  * Create and initialize a cxx11_file_stream from a file specified by filename
  * and mode. filename is expressed in UTF-16 encoding.
  * Append "b" to a supported mode (for example, "r+b") to use binary mode.
+ * On failure, *p_self is set to null when p_self is non-null.
  * @param p_self
  * @param wfilename
  * @param wmode

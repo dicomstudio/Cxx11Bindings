@@ -119,6 +119,8 @@ int file_stream_init(c11_stream** p_self, std::streambuf* streambuf,
 
 int cxx11_file_stream_create1(c11_stream** p_self, const char* filename,
                               const char* mode) {
+  if (!p_self) return C11_E_POINTER;
+  *p_self = nullptr;
   if (filename && mode) {
     const std::ios::openmode open_mode = file_mode_to_ios_flags(mode);
     const auto fb = new std::filebuf();
@@ -146,6 +148,8 @@ bool wchar_to_ascii(const wchar_t* wstr, char* str, const int str_size) {
 #endif
 int cxx11_file_stream_create2(c11_stream** p_self, const wchar_t* wfilename,
                               const wchar_t* wmode) {
+  if (!p_self) return C11_E_POINTER;
+  *p_self = nullptr;
   if (wfilename && wmode) {
     const auto fb = new std::filebuf();
 #ifdef _MSC_VER

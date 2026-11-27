@@ -9,6 +9,39 @@
 #include <limits>
 #include <sstream>
 
+TEST(FilebufStreamCreate, ClearsOutputOnFailure) {
+  c11_stream sentinel = {};
+  c11_stream* stream = &sentinel;
+
+  EXPECT_EQ(cxx11_file_stream_create1(&stream, nullptr, "r"), C11_E_INVALIDARG);
+  EXPECT_EQ(stream, nullptr);
+  stream = &sentinel;
+  EXPECT_EQ(cxx11_file_stream_create1(&stream, "unused", nullptr),
+            C11_E_INVALIDARG);
+  EXPECT_EQ(stream, nullptr);
+  stream = &sentinel;
+  EXPECT_EQ(cxx11_file_stream_create1(&stream, "", "r"), C11_E_IO);
+  EXPECT_EQ(stream, nullptr);
+
+  stream = &sentinel;
+  EXPECT_EQ(cxx11_file_stream_create2(&stream, nullptr, L"r"), C11_E_INVALIDARG);
+  EXPECT_EQ(stream, nullptr);
+  stream = &sentinel;
+  EXPECT_EQ(cxx11_file_stream_create2(&stream, L"unused", nullptr),
+            C11_E_INVALIDARG);
+  EXPECT_EQ(stream, nullptr);
+  stream = &sentinel;
+  EXPECT_EQ(cxx11_file_stream_create2(&stream, L"", L"r"), C11_E_IO);
+  EXPECT_EQ(stream, nullptr);
+}
+
+TEST(FilebufStreamCreate, RejectsNullOutput) {
+  EXPECT_EQ(cxx11_file_stream_create1(nullptr, "", "r"), C11_E_POINTER);
+  EXPECT_EQ(cxx11_file_stream_create2(nullptr, L"", L"r"), C11_E_POINTER);
+  EXPECT_EQ(cxx11_file_stream_create1(nullptr, nullptr, nullptr), C11_E_POINTER);
+  EXPECT_EQ(cxx11_file_stream_create2(nullptr, nullptr, nullptr), C11_E_POINTER);
+}
+
 TEST(FilebufStreamDestroy, RejectsNull) {
   EXPECT_EQ(cxx11_file_stream_destroy(nullptr), C11_E_INVALIDARG);
 }
