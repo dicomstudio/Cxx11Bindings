@@ -86,6 +86,10 @@ enum error_codes {
 
 // 'c11' is the namespace, 'stream' is the type:
 struct c11_stream;
+// The stream interface is synchronous: each callback completes its operation
+// and returns its result before the call returns. Read and write callbacks
+// must not access the supplied buffer after returning. Calls may block.
+// No asynchronous completion or thread-safety guarantee is provided.
 // function declaration for stream interface
 // all return types are signed to allow error codes to be returned
 // Return the number of bytes read (0..count), or a negative error if no
