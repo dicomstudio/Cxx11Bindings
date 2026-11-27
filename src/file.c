@@ -80,6 +80,7 @@ static int file_stream_init(struct c11_stream** p_self, FILE* file,
 
 int c11_file_stream_create1(struct c11_stream** p_self,
                             const char* filename, const char* mode) {
+  if (!p_self) return C11_E_POINTER;
   if (filename && mode) {
     FILE* file = fopen(filename, mode);
     if (file) {
@@ -96,6 +97,7 @@ int c11_file_stream_create1(struct c11_stream** p_self,
 
 int c11_file_stream_create2(struct c11_stream** p_self,
                             const wchar_t* filename, const wchar_t* mode) {
+  if (!p_self) return C11_E_POINTER;
   if (filename && mode) {
 #ifdef _MSC_VER
     FILE* file = _wfopen(filename, mode);
@@ -132,6 +134,7 @@ int c11_file_stream_destroy(struct c11_stream* self) {
 
 
 int c11_file_stream_init(struct c11_stream** p_self, FILE* stream) {
+  if (!p_self) return C11_E_POINTER;
   if (stream) return file_stream_init(p_self, stream, false);
   return C11_E_INVALIDARG;
 }
@@ -201,6 +204,7 @@ static int handle_stream_init(struct c11_stream** p_self, const HANDLE handle,
 }
 
 int c11_handle_stream_init(struct c11_stream** p_self, const HANDLE handle) {
+  if (!p_self) return C11_E_POINTER;
   if (handle != NULL) return handle_stream_init(p_self, handle, false);
   return C11_E_INVALIDARG;
 }
@@ -249,7 +253,7 @@ static stream_length fd_trunc(struct c11_stream* self,
 
 static int fd_stream_init(struct c11_stream** p_self, const int fd,
                           const bool created) {
-  assert(fd!=0);
+  assert(fd>=0);
   struct fd_stream* self = malloc(sizeof(*self));
   if (self) {
     *p_self = &self->super;
@@ -269,7 +273,8 @@ static int fd_stream_init(struct c11_stream** p_self, const int fd,
 }
 
 int c11_fd_stream_init(struct c11_stream** p_self, int fd) {
-  if (fd) return fd_stream_init(p_self, fd, false);
+  if (!p_self) return C11_E_POINTER;
+  if (fd >= 0) return fd_stream_init(p_self, fd, false);
   return C11_E_INVALIDARG;
 }
 #endif

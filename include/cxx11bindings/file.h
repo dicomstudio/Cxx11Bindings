@@ -14,6 +14,9 @@
 extern "C" {
 #endif
 
+/* All create/init functions require a non-null p_self and return
+ * C11_E_POINTER if it is null. */
+
 /**
  * Create and initialize a c11_file_stream from a file specified by filename and
  * mode. filename is expressed in UTF-8 encoding.
