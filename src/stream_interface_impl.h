@@ -137,6 +137,15 @@ static inline int64_t ftruncate_file_fp(FILE* fp, int64_t new_size) {
     return C11_E_INVALIDARG;
   }
 
+#ifndef _WIN32
+  // POSIX fflush discards unread input that fseek may retain in its buffer.
+  // clang only ?
+  const int flush_ret = fflush_file_fp(fp);
+  if (flush_ret < 0) {
+    return flush_ret;
+  }
+#endif
+
 #ifdef _WIN32
   const int fd = _fileno(fp);
   if (fd < 0) {
