@@ -152,8 +152,13 @@ class basic_streambuf final : public std::streambuf {
     setp(base, base + buffer_.size());
   }
 
-  ~basic_streambuf() override {
-    sync();  // flush pending output
+  // Destruction is best-effort; call pubsync() explicitly to detect errors.
+  ~basic_streambuf() noexcept override {
+    try {
+      sync();
+    } catch (...) {
+      // An exception cannot be reported safely from a destructor.
+    }
   }
 
  protected:

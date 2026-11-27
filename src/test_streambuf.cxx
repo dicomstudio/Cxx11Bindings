@@ -678,6 +678,31 @@ TEST(DefaultStreamBuf, DestructorFlushesPendingOutput) {
   EXPECT_EQ(target.output, "pending");
 }
 
+TEST(DefaultStreamBuf, DestructorSurvivesWriteException) {
+  partial_stream target;
+  target.fail = true;
+  {
+    cxx11::basic_streambuf buffer(target);
+    ASSERT_EQ(buffer.sputn("abcde", 5), 5);
+  }
+  EXPECT_EQ(target.calls, 2);
+  EXPECT_EQ(target.written, "ab");
+}
+
+TEST(DefaultStreamBuf, DestructorSurvivesWriteExceptionDuringUnwinding) {
+  partial_stream target;
+  target.fail = true;
+  try {
+    cxx11::basic_streambuf buffer(target);
+    ASSERT_EQ(buffer.sputn("abcde", 5), 5);
+    throw std::runtime_error("outer error");
+  } catch (const std::runtime_error& error) {
+    EXPECT_STREQ(error.what(), "outer error");
+  }
+  EXPECT_EQ(target.calls, 2);
+  EXPECT_EQ(target.written, "ab");
+}
+
 TEST(ShortWrite, BufferedStreamRetriesPartialProgress) {
   partial_stream target;
   cxx11::basic_streambuf buffer(target);
