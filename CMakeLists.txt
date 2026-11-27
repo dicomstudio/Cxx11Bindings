@@ -168,6 +168,11 @@ include(CTest)
 if(BUILD_TESTING)
   enable_testing()
 
+  add_executable(${PROJECT_NAME}_memory_tests src/memory.c)
+  target_include_directories(${PROJECT_NAME}_memory_tests
+                             PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
+  add_test(NAME MemoryStream COMMAND ${PROJECT_NAME}_memory_tests)
+
   # verify that code can be compiled in C11-only:
   if(C11B_BUILD_FILE)
     add_executable(${PROJECT_NAME}_comp src/test_cfile.c)
