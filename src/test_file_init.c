@@ -62,9 +62,18 @@ int main(void) {
   CHECK(c11_handle_stream_init(NULL, GetCurrentProcess()) == C11_E_POINTER);
   CHECK(c11_handle_stream_init(&stream, INVALID_HANDLE_VALUE) ==
         C11_E_INVALIDARG);
+  CHECK(c11_handle_stream_destroy(NULL) == C11_E_INVALIDARG);
+  HANDLE handle = CreateFileW(L"NUL", GENERIC_READ,
+                              FILE_SHARE_READ | FILE_SHARE_WRITE, NULL,
+                              OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+  CHECK(handle != INVALID_HANDLE_VALUE);
+  CHECK(c11_handle_stream_init(&stream, handle) == 0);
+  CHECK(c11_handle_stream_destroy(stream) == 0);
+  CHECK(CloseHandle(handle));
 #else
   CHECK(c11_fd_stream_init(NULL, 0) == C11_E_POINTER);
   CHECK(c11_fd_stream_init(&stream, -1) == C11_E_INVALIDARG);
+  CHECK(c11_fd_stream_destroy(NULL) == C11_E_INVALIDARG);
 
   int fds[2];
   CHECK(pipe(fds) == 0);
@@ -78,7 +87,7 @@ int main(void) {
   byte value = 0;
   CHECK(c11_stream_read(stream, &value, 1) == 1);
   CHECK(value == 'x');
-  CHECK(c11_file_stream_destroy(stream) == 0);
+  CHECK(c11_fd_stream_destroy(stream) == 0);
   CHECK(fcntl(0, F_GETFD) != -1);
   CHECK(close(0) == 0);
   CHECK(close(fds[1]) == 0);
@@ -100,7 +109,7 @@ int main(void) {
       c11_stream_write(stream, data, (buf_size)(pipe_buf * 2));
   CHECK(partial > 0 && partial < pipe_buf * 2);
   CHECK(c11_stream_write(stream, data, (buf_size)pipe_buf) == C11_E_IO);
-  CHECK(c11_file_stream_destroy(stream) == 0);
+  CHECK(c11_fd_stream_destroy(stream) == 0);
 
   CHECK(read(fds[0], data, (size_t)pipe_buf) == pipe_buf);
   FILE* pipe_file = fdopen(fds[1], "w");

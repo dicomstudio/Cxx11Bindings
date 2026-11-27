@@ -185,7 +185,6 @@ struct handle_stream {
   struct c11_stream super;
   /* data */
   HANDLE handle;
-  bool is_created;
 };
 static buf_size handle_read(struct c11_stream* self, byte* buffer,
                           const buf_size count) {
@@ -223,8 +222,7 @@ static stream_length handle_trunc(struct c11_stream* self,
   return ret;
 }
 
-static int handle_stream_init(struct c11_stream** p_self, const HANDLE handle,
-                          const bool created) {
+static int handle_stream_init(struct c11_stream** p_self, const HANDLE handle) {
   assert(handle != NULL && handle != INVALID_HANDLE_VALUE);
   struct handle_stream* self = malloc(sizeof(*self));
   if (self) {
@@ -236,7 +234,6 @@ static int handle_stream_init(struct c11_stream** p_self, const HANDLE handle,
     stream->flush = handle_flush;
     stream->trunc = handle_trunc;
     self->handle = handle;
-    self->is_created = created;
     // success
     return 0;
   }
@@ -246,17 +243,21 @@ static int handle_stream_init(struct c11_stream** p_self, const HANDLE handle,
 
 int c11_handle_stream_init(struct c11_stream** p_self, const HANDLE handle) {
   if (!p_self) return C11_E_POINTER;
-  if (handle != NULL && handle != INVALID_HANDLE_VALUE) {
-    return handle_stream_init(p_self, handle, false);
-  }
+  if (handle != NULL && handle != INVALID_HANDLE_VALUE)
+    return handle_stream_init(p_self, handle);
   return C11_E_INVALIDARG;
+}
+
+int c11_handle_stream_destroy(struct c11_stream* self) {
+  if (!self) return C11_E_INVALIDARG;
+  free((struct handle_stream*)self);
+  return 0;
 }
 #else
 struct fd_stream {
   struct c11_stream super;
   /* data */
   int fd;
-  bool is_created;
 };
 static buf_size fd_read(struct c11_stream* self, byte* buffer,
                           const buf_size count) {
@@ -294,8 +295,7 @@ static stream_length fd_trunc(struct c11_stream* self,
   return ret;
 }
 
-static int fd_stream_init(struct c11_stream** p_self, const int fd,
-                          const bool created) {
+static int fd_stream_init(struct c11_stream** p_self, const int fd) {
   assert(fd>=0);
   struct fd_stream* self = malloc(sizeof(*self));
   if (self) {
@@ -307,7 +307,6 @@ static int fd_stream_init(struct c11_stream** p_self, const int fd,
     stream->flush = fd_flush;
     stream->trunc = fd_trunc;
     self->fd = fd;
-    self->is_created = created;
     // success
     return 0;
   }
@@ -317,7 +316,13 @@ static int fd_stream_init(struct c11_stream** p_self, const int fd,
 
 int c11_fd_stream_init(struct c11_stream** p_self, int fd) {
   if (!p_self) return C11_E_POINTER;
-  if (fd >= 0) return fd_stream_init(p_self, fd, false);
+  if (fd >= 0) return fd_stream_init(p_self, fd);
   return C11_E_INVALIDARG;
+}
+
+int c11_fd_stream_destroy(struct c11_stream* self) {
+  if (!self) return C11_E_INVALIDARG;
+  free((struct fd_stream*)self);
+  return 0;
 }
 #endif
