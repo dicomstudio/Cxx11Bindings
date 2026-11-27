@@ -210,11 +210,9 @@ class basic_streambuf final : public std::streambuf {
   // Seeking
   pos_type seekoff(off_type off, const std::ios_base::seekdir way,
                    const std::ios_base::openmode which) override {
-    // Flush output buffer before seeking
-    if (which & std::ios_base::out) {
-      if (sync() == -1) {
-        return {-1};
-      }
+    // Both input and output seeks change the shared underlying position.
+    if (sync() == -1) {
+      return {-1};
     }
 
     // Calculate origin
