@@ -15,6 +15,7 @@ extern "C" {
  * and mode. filename is expressed in UTF-8 encoding.
  * Append "b" to a supported mode (for example, "r+b") to use binary mode.
  * On failure, *p_self is set to null when p_self is non-null.
+ * A null p_self returns C11_E_POINTER without opening the file.
  * On Windows, malformed UTF-8 filenames are rejected.
  * @param p_self
  * @param filename
@@ -32,6 +33,7 @@ CXX11_BINDINGS_EXPORT int cxx11_file_stream_create1(c11_stream** p_self,
  * UTF-32 on POSIX); POSIX filenames are encoded as UTF-8.
  * Append "b" to a supported mode (for example, "r+b") to use binary mode.
  * On failure, *p_self is set to null when p_self is non-null.
+ * A null p_self returns C11_E_POINTER without opening the file.
  * @param p_self
  * @param wfilename
  * @param wmode
