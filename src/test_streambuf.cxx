@@ -10,6 +10,24 @@
 #include <limits>
 #include <sstream>
 
+TEST(MemoryStream, WorksWithCppAdapters) {
+  byte storage[16] = {};
+  c11_memory_stream memory;
+  ASSERT_EQ(c11_memory_stream_init(&memory, storage, sizeof storage, 0), 0);
+  cxx11::c_stream stream(&memory.super);
+  {
+    cxx11::basic_streambuf buffer(stream);
+    std::iostream io(&buffer);
+    io << "hello" << std::flush;
+    ASSERT_TRUE(io.good());
+    io.seekg(0);
+    std::string result;
+    io >> result;
+    EXPECT_EQ(result, "hello");
+  }
+  EXPECT_EQ(memory.length, 5);
+}
+
 TEST(FilebufStreamInit, RejectsNullArguments) {
   std::stringbuf buffer;
   EXPECT_EQ(cxx11_file_stream_init(nullptr, &buffer), C11_E_POINTER);

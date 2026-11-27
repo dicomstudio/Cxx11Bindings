@@ -11,6 +11,13 @@ interface directly using its own stream and native-compatible callbacks, then
 pass a pointer to the resulting `c11_stream` to C++ code. The foreign-language
 implementation must keep the stream and callbacks alive while they are in use.
 
+`stream.h` also provides `c11_memory_stream`, initialized with
+`c11_memory_stream_init(&memory, data, capacity, length)`. It borrows writable
+storage and requires no allocation or destruction. Writes may be short at
+capacity; seeks are bounded by capacity, and extending the length zero-fills
+the gap. Truncation preserves the current position. Use `&memory.super` with
+the `c11_stream` helpers.
+
 C++ application code can include `cxx11bindings/streambuf.hxx` directly. Its
 header-defined adapters, including `cxx11::c_stream` and
 `cxx11::basic_streambuf`, can be compiled into the application without linking

@@ -3,6 +3,7 @@
 
 #include <stddef.h>  // size_t
 #include <stdint.h>  // require c99
+#include <string.h>
 
 #define CXX11BINDINGS_VERSION_MAJOR 3
 #define CXX11BINDINGS_VERSION_MINOR 2
@@ -169,6 +170,109 @@ static inline stream_length c11_stream_trunc(struct c11_stream* c11_stream,
 }
 
 #undef CHECK_ARGS
+
+// Fixed-capacity, caller-owned memory. Keep both this object and its data
+// alive while the stream is in use, and do not copy an initialized object.
+struct c11_memory_stream {
+  struct c11_stream super;
+  byte* data;
+  stream_length capacity;
+  stream_length length;
+  stream_offset position;
+};
+
+static inline buf_size c11_memory_stream_read(struct c11_stream* self,
+                                               byte* buffer, buf_size count) {
+  struct c11_memory_stream* memory = (struct c11_memory_stream*)self;
+  stream_length available;
+  if (!memory || !buffer) return C11_E_POINTER;
+  if (count < 0) return C11_E_INVALIDARG;
+  if (memory->position >= memory->length) return 0;
+  available = memory->length - memory->position;
+  if (available < count) count = (buf_size)available;
+  memmove(buffer, memory->data + (size_t)memory->position, (size_t)count);
+  memory->position += count;
+  return count;
+}
+
+static inline buf_size c11_memory_stream_write(struct c11_stream* self,
+                                                const byte* buffer,
+                                                buf_size count) {
+  struct c11_memory_stream* memory = (struct c11_memory_stream*)self;
+  stream_length available;
+  if (!memory || !buffer) return C11_E_POINTER;
+  if (count < 0) return C11_E_INVALIDARG;
+  available = memory->capacity - memory->position;
+  if (available < count) count = (buf_size)available;
+  if (count == 0) return 0;
+  // Copy first so a source in the gap is not overwritten by zero filling.
+  memmove(memory->data + (size_t)memory->position, buffer, (size_t)count);
+  if (memory->position > memory->length) {
+    memset(memory->data + (size_t)memory->length, 0,
+           (size_t)(memory->position - memory->length));
+  }
+  memory->position += count;
+  if (memory->position > memory->length) memory->length = memory->position;
+  return count;
+}
+
+static inline stream_offset c11_memory_stream_seek(struct c11_stream* self,
+                                                    stream_offset off,
+                                                    seek_dir dir) {
+  struct c11_memory_stream* memory = (struct c11_memory_stream*)self;
+  stream_offset base;
+  if (!memory) return C11_E_POINTER;
+  switch (dir) {
+    case seek_beg: base = 0; break;
+    case seek_cur: base = memory->position; break;
+    case seek_end: base = memory->length; break;
+    default: return C11_E_INVALIDARG;
+  }
+  if (off < -base || off > memory->capacity - base)
+    return C11_E_INVALIDARG;
+  memory->position = base + off;
+  return memory->position;
+}
+
+static inline int c11_memory_stream_flush(struct c11_stream* self) {
+  return self ? 0 : C11_E_POINTER;
+}
+
+static inline stream_length c11_memory_stream_trunc(struct c11_stream* self,
+                                                     stream_length size) {
+  struct c11_memory_stream* memory = (struct c11_memory_stream*)self;
+  if (!memory) return C11_E_POINTER;
+  if (size < 0 || size > memory->capacity) return C11_E_INVALIDARG;
+  if (size > memory->length) {
+    memset(memory->data + (size_t)memory->length, 0,
+           (size_t)(size - memory->length));
+  }
+  memory->length = size;
+  return size;
+}
+
+// data may be null only for zero capacity. length is the initially valid data
+// size. Seeking is limited to [0, capacity]; truncate preserves position.
+static inline int c11_memory_stream_init(struct c11_memory_stream* self,
+                                         byte* data, stream_length capacity,
+                                         stream_length length) {
+  if (!self) return C11_E_POINTER;
+  if (capacity < 0 || length < 0 || length > capacity ||
+      (uintmax_t)capacity > (uintmax_t)SIZE_MAX)
+    return C11_E_INVALIDARG;
+  if (!data && capacity != 0) return C11_E_POINTER;
+  self->super.read = c11_memory_stream_read;
+  self->super.write = c11_memory_stream_write;
+  self->super.seek = c11_memory_stream_seek;
+  self->super.flush = c11_memory_stream_flush;
+  self->super.trunc = c11_memory_stream_trunc;
+  self->data = data;
+  self->capacity = capacity;
+  self->length = length;
+  self->position = 0;
+  return 0;
+}
+
 #ifdef __cplusplus
 }  // end extern "C"
 #endif
