@@ -336,6 +336,9 @@ class memory_stream : public cxx11::stream_interface {
   bool fail_seek = false;
   bool throw_on_seek = false;
   bool throw_after_seek = false;
+  bool throw_on_flush = false;
+  int flush_result = 0;
+  int flush_calls = 0;
   int read_calls = 0;
   int write_calls = 0;
   int seek_calls = 0;
@@ -396,7 +399,12 @@ class memory_stream : public cxx11::stream_interface {
     return position;
   }
 
-  int flush() override { return 0; }
+  int flush() override {
+    ++flush_calls;
+    if (throw_on_flush)
+      throw cxx11::stream_exception(cxx11::ErrorCode::IOException);
+    return flush_result;
+  }
   stream_length trunc(stream_length size) override { return size; }
 };
 
@@ -495,10 +503,79 @@ TEST(DefaultStreamBuf, FlushesOutputWhenBufferFillsAndOnSync) {
 
   EXPECT_EQ(buffer.sputn("abcdefghijklm", 13), 13);
   EXPECT_EQ(target.output, "abcdefghij");
+  EXPECT_EQ(target.flush_calls, 0);
   EXPECT_EQ(buffer.pubsync(), 0);
   EXPECT_EQ(target.output, "abcdefghijklm");
+  EXPECT_EQ(target.flush_calls, 1);
   EXPECT_EQ(buffer.pubsync(), 0);
   EXPECT_EQ(target.output, "abcdefghijklm");
+  EXPECT_EQ(target.flush_calls, 2);
+}
+
+TEST(DefaultStreamBuf, FlushFailureCanBeRetriedWithoutRewriting) {
+  memory_stream target;
+  target.flush_result = C11_E_IO;
+  cxx11::basic_streambuf buffer(target);
+  ASSERT_EQ(buffer.sputn("pending", 7), 7);
+  EXPECT_EQ(buffer.pubsync(), -1);
+  EXPECT_EQ(target.output, "pending");
+  EXPECT_EQ(target.write_calls, 1);
+  EXPECT_EQ(target.flush_calls, 1);
+
+  target.flush_result = 0;
+  EXPECT_EQ(buffer.pubsync(), 0);
+  EXPECT_EQ(target.write_calls, 1);
+  EXPECT_EQ(target.flush_calls, 2);
+}
+
+TEST(DefaultStreamBuf, FlushExceptionCanBeRetriedWithoutRewriting) {
+  memory_stream target;
+  target.throw_on_flush = true;
+  cxx11::basic_streambuf buffer(target);
+  ASSERT_EQ(buffer.sputn("pending", 7), 7);
+  EXPECT_THROW(buffer.pubsync(), cxx11::stream_exception);
+  EXPECT_EQ(target.output, "pending");
+  EXPECT_EQ(target.write_calls, 1);
+  EXPECT_EQ(target.flush_calls, 1);
+
+  target.throw_on_flush = false;
+  EXPECT_EQ(buffer.pubsync(), 0);
+  EXPECT_EQ(target.write_calls, 1);
+  EXPECT_EQ(target.flush_calls, 2);
+}
+
+TEST(DefaultStreamBuf, OstreamFlushReportsUnderlyingFailure) {
+  memory_stream target;
+  target.flush_result = C11_E_IO;
+  cxx11::basic_streambuf buffer(target);
+  std::ostream output(&buffer);
+  output << "data" << std::flush;
+  EXPECT_TRUE(output.bad());
+  EXPECT_EQ(target.output, "data");
+  EXPECT_EQ(target.flush_calls, 1);
+}
+
+TEST(DefaultStreamBuf, WriteFailureDoesNotFlushUnderlyingStream) {
+  memory_stream target;
+  target.max_write = 0;
+  cxx11::basic_streambuf buffer(target);
+  ASSERT_EQ(buffer.sputn("pending", 7), 7);
+  EXPECT_EQ(buffer.pubsync(), -1);
+  EXPECT_EQ(target.flush_calls, 0);
+  target.max_write = (std::numeric_limits<buf_size>::max)();
+  EXPECT_EQ(buffer.pubsync(), 0);
+  EXPECT_EQ(target.output, "pending");
+  EXPECT_EQ(target.flush_calls, 1);
+}
+
+TEST(DefaultStreamBuf, SeekDoesNotRequireUnderlyingFlush) {
+  memory_stream target;
+  target.input = "abc";
+  target.flush_result = C11_E_NOTSUPPORTED;
+  cxx11::basic_streambuf buffer(target);
+  EXPECT_EQ(buffer.pubseekpos(1, std::ios_base::in), std::streampos(1));
+  EXPECT_EQ(target.flush_calls, 0);
+  EXPECT_EQ(buffer.sgetc(), 'b');
 }
 
 TEST(DefaultStreamBuf, RetainsOutputAfterInvalidWriteCount) {
@@ -676,6 +753,18 @@ TEST(DefaultStreamBuf, DestructorFlushesPendingOutput) {
     EXPECT_TRUE(target.output.empty());
   }
   EXPECT_EQ(target.output, "pending");
+  EXPECT_EQ(target.flush_calls, 1);
+}
+
+TEST(DefaultStreamBuf, DestructorSurvivesFlushException) {
+  memory_stream target;
+  target.throw_on_flush = true;
+  {
+    cxx11::basic_streambuf buffer(target);
+    ASSERT_EQ(buffer.sputn("pending", 7), 7);
+  }
+  EXPECT_EQ(target.output, "pending");
+  EXPECT_EQ(target.flush_calls, 1);
 }
 
 TEST(DefaultStreamBuf, DestructorSurvivesWriteException) {

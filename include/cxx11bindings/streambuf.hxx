@@ -210,13 +210,18 @@ class basic_streambuf final : public std::streambuf {
     return traits_type::not_eof(ch);
   }
 
-  int sync() override { return flush_buffer() == traits_type::eof() ? -1 : 0; }
+  int sync() override {
+    if (flush_buffer() == traits_type::eof()) {
+      return -1;
+    }
+    return stream_.flush() == 0 ? 0 : -1;
+  }
 
   // Seeking
   pos_type seekoff(off_type off, const std::ios_base::seekdir way,
                    const std::ios_base::openmode which) override {
     // Both input and output seeks change the shared underlying position.
-    if (sync() == -1) {
+    if (flush_buffer() == traits_type::eof()) {
       return {-1};
     }
 
