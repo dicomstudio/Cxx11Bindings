@@ -1,6 +1,28 @@
 # Cxx11Bindings
 
-This is a lightweight C11 header-only library to help bind C++11 code to foreign languages like C#.
+Cxx11Bindings defines a lightweight, header-only stream interface for connecting
+C++11 code to other languages, such as C# and Python.
+
+## Interface and implementations
+
+The interface is the C ABI defined by `c11_stream` in
+`cxx11bindings/stream.h`. A foreign-language application can implement this
+interface directly using its own stream and native-compatible callbacks, then
+pass a pointer to the resulting `c11_stream` to C++ code. The foreign-language
+implementation must keep the stream and callbacks alive while they are in use.
+
+C++ application code can include `cxx11bindings/streambuf.hxx` directly. Its
+header-defined adapters, including `cxx11::c_stream` and
+`cxx11::basic_streambuf`, can be compiled into the application without linking
+against the Cxx11Bindings shared library. `cxx11::c_stream` wraps the
+ABI-facing `c11_stream`; it is a C++ adapter, not the C ABI itself.
+
+The optional compiled shared library supplies `FILE*` and `std::filebuf`
+implementations of the interface. These are useful examples or ready-made
+adapters, not a required dependency for code that implements the interface
+directly. A foreign-language implementation typically provides its own
+callbacks rather than using this shared library; it must still load or link
+whatever native application library consumes the interface.
 
 ## Implementation details
 
