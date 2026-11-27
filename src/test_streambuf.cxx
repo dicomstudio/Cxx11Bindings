@@ -2,11 +2,60 @@
 
 #include <cxx11bindings/filebuf.hxx>
 #include <algorithm>
+#include <cstdio>
 #include <cstring>
 #include <fstream>  // std::filebuf
 #include <gtest/gtest.h>
 #include <limits>
 #include <sstream>
+
+TEST(FilebufStreamDestroy, RejectsNull) {
+  EXPECT_EQ(cxx11_file_stream_destroy(nullptr), C11_E_INVALIDARG);
+}
+
+TEST(FilebufStreamDestroy, LeavesBorrowedBufferUntouched) {
+  std::stringbuf buffer;
+  c11_stream* stream = nullptr;
+  ASSERT_EQ(cxx11_file_stream_init(&stream, &buffer), 0);
+  const byte data[] = {'a', 'b'};
+  ASSERT_EQ(c11_stream_write(stream, data, sizeof data), sizeof data);
+  EXPECT_EQ(cxx11_file_stream_destroy(stream), 0);
+  EXPECT_EQ(buffer.str(), "ab");
+  EXPECT_NE(buffer.sputc('c'), std::char_traits<char>::eof());
+  EXPECT_EQ(buffer.str(), "abc");
+}
+
+TEST(FilebufStreamDestroy, ClosesOwnedFileAndFlushesOutput) {
+  const char* filename = "filebuf_destroy_test.tmp";
+  c11_stream* stream = nullptr;
+  ASSERT_EQ(cxx11_file_stream_create1(&stream, filename, "wb"), 0);
+  const byte data[] = {'a', 'b', 'c'};
+  EXPECT_EQ(c11_stream_write(stream, data, sizeof data), sizeof data);
+  EXPECT_EQ(cxx11_file_stream_destroy(stream), 0);
+  std::ifstream input(filename, std::ios::binary);
+  ASSERT_TRUE(input.is_open());
+  char readback[sizeof data] = {};
+  input.read(readback, sizeof readback);
+  EXPECT_EQ(input.gcount(), sizeof readback);
+  EXPECT_EQ(std::string(readback, sizeof readback), "abc");
+  input.close();
+  EXPECT_EQ(std::remove(filename), 0);
+}
+
+#ifdef __linux__
+TEST(FilebufStreamDestroy, ReportsOwnedFileCloseFailure) {
+  std::ifstream available("/dev/full");
+  if (!available.is_open()) {
+    GTEST_SKIP() << "/dev/full is unavailable";
+  }
+  available.close();
+  c11_stream* stream = nullptr;
+  ASSERT_EQ(cxx11_file_stream_create1(&stream, "/dev/full", "wb"), 0);
+  const byte value = 'x';
+  ASSERT_EQ(c11_stream_write(stream, &value, 1), 1);
+  EXPECT_EQ(cxx11_file_stream_destroy(stream), C11_E_IO);
+}
+#endif
 
 TEST(ErrorMapping, ExtendedCallbackErrorsRetainTheirCodes) {
   const cxx11::ErrorCode codes[] = {

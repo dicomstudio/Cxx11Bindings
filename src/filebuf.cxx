@@ -169,8 +169,19 @@ int cxx11_file_stream_create2(c11_stream** p_self, const wchar_t* wfilename,
 int cxx11_file_stream_destroy(c11_stream* self) {
   if (self) {
     const auto fs = reinterpret_cast<filebuf_stream*>(self);
+    int ret = 0;
+    if (fs->is_created) {
+      try {
+        if (!static_cast<std::filebuf*>(fs->file)->close()) {
+          ret = C11_E_IO;
+        }
+      } catch (...) {
+        // std::filebuf::close can propagate exceptions from its locale facets.
+        ret = C11_E_IO;
+      }
+    }
     delete fs;
-    return 0;
+    return ret;
   }
   return C11_E_INVALIDARG;
 }
