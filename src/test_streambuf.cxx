@@ -300,6 +300,7 @@ class partial_stream : public cxx11::stream_interface {
  public:
   std::string written;
   int calls = 0;
+  int seek_calls = 0;
   bool stall = false;
   bool fail = false;
 
@@ -313,7 +314,10 @@ class partial_stream : public cxx11::stream_interface {
     written.append(reinterpret_cast<const char*>(data), n);
     return n;
   }
-  stream_offset seek(stream_offset, seek_dir) override { return 0; }
+  stream_offset seek(stream_offset, seek_dir) override {
+    ++seek_calls;
+    return 0;
+  }
   int flush() override { return 0; }
   stream_length trunc(stream_length size) override { return size; }
 };
@@ -581,6 +585,53 @@ TEST(DefaultStreamBuf, OutputSeekFlushesAndDoesNotSeekAfterFlushFailure) {
             std::streampos(0));
   EXPECT_EQ(target.output, "x");
   EXPECT_EQ(target.seek_calls, 1);
+}
+
+TEST(DefaultStreamBuf, InputSeekFlushesPendingOutput) {
+  for (const bool seek_position : {false, true}) {
+    memory_stream target;
+    target.input = "abc";
+    cxx11::basic_streambuf buffer(target);
+    ASSERT_EQ(buffer.sputn("pending", 7), 7);
+
+    const auto pos = seek_position
+                         ? buffer.pubseekpos(1, std::ios_base::in)
+                         : buffer.pubseekoff(1, std::ios_base::beg,
+                                             std::ios_base::in);
+    EXPECT_EQ(pos, std::streampos(1));
+    EXPECT_EQ(target.output, "pending");
+    EXPECT_EQ(target.seek_calls, 1);
+    EXPECT_EQ(buffer.pubsync(), 0);
+    EXPECT_EQ(target.output, "pending");
+    EXPECT_EQ(buffer.sgetc(), 'b');
+  }
+}
+
+TEST(DefaultStreamBuf, InputSeekDoesNotProceedAfterPartialFlushFailure) {
+  for (const bool throw_on_write : {false, true}) {
+    partial_stream target;
+    target.stall = !throw_on_write;
+    target.fail = throw_on_write;
+    cxx11::basic_streambuf buffer(target);
+    ASSERT_EQ(buffer.sputn("abcde", 5), 5);
+
+    if (throw_on_write) {
+      EXPECT_THROW(buffer.pubseekpos(0, std::ios_base::in),
+                   cxx11::stream_exception);
+    } else {
+      EXPECT_EQ(buffer.pubseekpos(0, std::ios_base::in), std::streampos(-1));
+    }
+    EXPECT_EQ(target.seek_calls, 0);
+    EXPECT_EQ(target.written, "ab");
+
+    target.stall = false;
+    target.fail = false;
+    EXPECT_EQ(buffer.pubseekpos(0, std::ios_base::in), std::streampos(0));
+    EXPECT_EQ(target.seek_calls, 1);
+    EXPECT_EQ(target.written, "abcde");
+    EXPECT_EQ(buffer.pubsync(), 0);
+    EXPECT_EQ(target.written, "abcde");
+  }
 }
 
 TEST(DefaultStreamBuf, PropagatesSeekException) {
