@@ -14,6 +14,31 @@ struct file_stream {
   bool is_created;
 };
 
+#ifdef _WIN32
+static int utf8_to_wide(const char* input, wchar_t** output) {
+  int length;
+  wchar_t* buffer;
+
+  *output = NULL;
+  length = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, input, -1, NULL,
+                               0);
+  if (length == 0) return C11_E_INVALIDARG;
+  if ((size_t)length > (size_t)-1 / sizeof(*buffer)) {
+    return C11_E_OUTOFMEMORY;
+  }
+
+  buffer = (wchar_t*)malloc((size_t)length * sizeof(*buffer));
+  if (!buffer) return C11_E_OUTOFMEMORY;
+  if (!MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, input, -1, buffer,
+                           length)) {
+    free(buffer);
+    return C11_E_INVALIDARG;
+  }
+
+  *output = buffer;
+  return 0;
+}
+#endif
 
 static buf_size file_read(struct c11_stream* self, byte* buffer,
                           const buf_size count) {
@@ -82,11 +107,27 @@ int c11_file_stream_create1(struct c11_stream** p_self,
                             const char* filename, const char* mode) {
   if (!p_self) return C11_E_POINTER;
   if (filename && mode) {
+#ifdef _WIN32
+    wchar_t* wide_filename;
+    wchar_t* wide_mode;
+    int ret = utf8_to_wide(filename, &wide_filename);
+    if (ret < 0) return ret;
+    ret = utf8_to_wide(mode, &wide_mode);
+    if (ret < 0) {
+      free(wide_filename);
+      return ret;
+    }
+    FILE* file = _wfopen(wide_filename, wide_mode);
+    free(wide_filename);
+    free(wide_mode);
+#else
     FILE* file = fopen(filename, mode);
+#endif
     if (file) {
       const int ret = file_stream_init(p_self, file, true);
       if (ret == 0) return 0;
       (void)fclose(file);
+      return ret;
     }
     // else
     return C11_E_IO;

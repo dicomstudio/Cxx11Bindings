@@ -35,6 +35,13 @@ int main(void) {
   CHECK(c11_file_stream_init(NULL, file) == C11_E_POINTER);
 
   struct c11_stream* stream = NULL;
+#ifdef _WIN32
+  const char utf8_filename[] = "c11_utf8_\xC3\xA9_test.tmp";
+  const wchar_t wide_filename[] = L"c11_utf8_\u00E9_test.tmp";
+  CHECK(c11_file_stream_create1(&stream, utf8_filename, "wb") == 0);
+  CHECK(c11_file_stream_destroy(stream) == 0);
+  CHECK(DeleteFileW(wide_filename));
+#endif
   CHECK(c11_file_stream_init(&stream, file) == 0);
   CHECK(stream != NULL);
   const byte contents[] = {'a', 'b', 'c', 'd'};
