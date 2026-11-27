@@ -392,6 +392,30 @@ class memory_stream : public cxx11::stream_interface {
   stream_length trunc(stream_length size) override { return size; }
 };
 
+TEST(DefaultStreamBuf, RejectsInvalidBufferSizes) {
+  memory_stream target;
+  EXPECT_THROW(cxx11::basic_streambuf(target, 0), std::invalid_argument);
+  EXPECT_THROW(cxx11::basic_streambuf(
+                   target, (std::numeric_limits<std::size_t>::max)()),
+               std::length_error);
+  EXPECT_THROW(cxx11::basic_streambuf(
+                   target, static_cast<std::size_t>(
+                               (std::numeric_limits<buf_size>::max)()) -
+                               cxx11::put_back_size + 1),
+               std::length_error);
+  EXPECT_EQ(target.read_calls, 0);
+  EXPECT_EQ(target.write_calls, 0);
+}
+
+TEST(DefaultStreamBuf, ReadsWithMinimumBufferSize) {
+  memory_stream target;
+  target.input = "ab";
+  cxx11::basic_streambuf buffer(target, 1);
+  EXPECT_EQ(buffer.sbumpc(), 'a');
+  EXPECT_EQ(buffer.sbumpc(), 'b');
+  EXPECT_EQ(buffer.sgetc(), std::char_traits<char>::eof());
+}
+
 TEST(DefaultStreamBuf, ReadsShortChunksAndReportsEndOfInput) {
   memory_stream target;
   target.input = "abcdefgh";
