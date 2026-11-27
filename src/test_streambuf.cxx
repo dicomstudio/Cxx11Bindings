@@ -1,8 +1,11 @@
 #include "stream_interface_impl.hxx"
 
 #include <cxx11bindings/filebuf.hxx>
+#include <algorithm>
+#include <cstring>
 #include <fstream>  // std::filebuf
 #include <gtest/gtest.h>
+#include <limits>
 #include <sstream>
 
 TEST(ErrorMapping, ExtendedCallbackErrorsRetainTheirCodes) {
@@ -79,6 +82,231 @@ class partial_stream : public cxx11::stream_interface {
   int flush() override { return 0; }
   stream_length trunc(stream_length size) override { return size; }
 };
+
+class memory_stream : public cxx11::stream_interface {
+ public:
+  std::string input;
+  std::string output;
+  stream_offset position = 0;
+  buf_size max_read = (std::numeric_limits<buf_size>::max)();
+  buf_size max_write = (std::numeric_limits<buf_size>::max)();
+  bool throw_on_read = false;
+  bool overreport_write = false;
+  bool fail_seek = false;
+  bool throw_on_seek = false;
+  int read_calls = 0;
+  int write_calls = 0;
+  int seek_calls = 0;
+  stream_offset last_seek_offset = 0;
+  seek_dir last_seek_direction = seek_dirs::seek_beg;
+
+  buf_size read(byte* buffer, buf_size count) override {
+    ++read_calls;
+    if (throw_on_read) throw cxx11::io_exception();
+    if (count <= 0 || position < 0 ||
+        static_cast<std::size_t>(position) >= input.size()) {
+      return 0;
+    }
+    const buf_size available = static_cast<buf_size>(
+        input.size() - static_cast<std::size_t>(position));
+    const buf_size n = (std::min)((std::min)(count, available), max_read);
+    std::memcpy(buffer, input.data() + position, static_cast<std::size_t>(n));
+    position += n;
+    return n;
+  }
+
+  buf_size write(const byte* buffer, buf_size count) override {
+    ++write_calls;
+    if (overreport_write) return count + 1;
+    const buf_size n = (std::min)(count, max_write);
+    output.append(reinterpret_cast<const char*>(buffer),
+                  static_cast<std::size_t>(n));
+    return n;
+  }
+
+  stream_offset seek(stream_offset off, seek_dir direction) override {
+    ++seek_calls;
+    last_seek_offset = off;
+    last_seek_direction = direction;
+    if (throw_on_seek) throw cxx11::io_exception();
+    if (fail_seek) return -1;
+
+    stream_offset base = 0;
+    if (direction == seek_dirs::seek_cur) {
+      base = position;
+    } else if (direction == seek_dirs::seek_end) {
+      base = static_cast<stream_offset>(input.size());
+    } else if (direction != seek_dirs::seek_beg) {
+      return -1;
+    }
+    const stream_offset target = base + off;
+    if (target < 0 ||
+        target > static_cast<stream_offset>(input.size())) {
+      return -1;
+    }
+    position = target;
+    return position;
+  }
+
+  int flush() override { return 0; }
+  stream_length trunc(stream_length size) override { return size; }
+};
+
+TEST(DefaultStreamBuf, ReadsShortChunksAndReportsEndOfInput) {
+  memory_stream target;
+  target.input = "abcdefgh";
+  target.max_read = 2;
+  cxx11::basic_streambuf buffer(target, 4);
+
+  char result[8] = {};
+  EXPECT_EQ(buffer.sgetn(result, sizeof result), sizeof result);
+  EXPECT_EQ(std::string(result, sizeof result), target.input);
+  EXPECT_EQ(target.read_calls, 4);
+  EXPECT_EQ(buffer.sgetc(), std::char_traits<char>::eof());
+}
+
+TEST(DefaultStreamBuf, PropagatesReadException) {
+  memory_stream target;
+  target.throw_on_read = true;
+  cxx11::basic_streambuf buffer(target);
+
+  EXPECT_THROW(buffer.sgetc(), cxx11::io_exception);
+}
+
+TEST(DefaultStreamBuf, PreservesPutbackCharactersAcrossRefill) {
+  memory_stream target;
+  target.input = "abcdefghijklmnop";
+  cxx11::basic_streambuf buffer(target, 4);
+
+  char result[12] = {};
+  ASSERT_EQ(buffer.sgetn(result, sizeof result), sizeof result);
+  EXPECT_EQ(std::string(result, sizeof result), "abcdefghijkl");
+  EXPECT_EQ(buffer.sgetc(), 'm');
+
+  const std::string putback = "lkjihgfe";
+  for (const char expected : putback) {
+    ASSERT_NE(buffer.sungetc(), std::char_traits<char>::eof());
+    EXPECT_EQ(buffer.sgetc(), expected);
+  }
+  EXPECT_EQ(buffer.sungetc(), std::char_traits<char>::eof());
+}
+
+TEST(DefaultStreamBuf, FlushesOutputWhenBufferFillsAndOnSync) {
+  memory_stream target;
+  cxx11::basic_streambuf buffer(target, 2);
+
+  EXPECT_EQ(buffer.sputn("abcdefghijklm", 13), 13);
+  EXPECT_EQ(target.output, "abcdefghij");
+  EXPECT_EQ(buffer.pubsync(), 0);
+  EXPECT_EQ(target.output, "abcdefghijklm");
+  EXPECT_EQ(buffer.pubsync(), 0);
+  EXPECT_EQ(target.output, "abcdefghijklm");
+}
+
+TEST(DefaultStreamBuf, RetainsOutputAfterInvalidWriteCount) {
+  memory_stream target;
+  target.overreport_write = true;
+  cxx11::basic_streambuf buffer(target);
+
+  ASSERT_EQ(buffer.sputn("pending", 7), 7);
+  EXPECT_EQ(buffer.pubsync(), -1);
+  EXPECT_TRUE(target.output.empty());
+
+  target.overreport_write = false;
+  EXPECT_EQ(buffer.pubsync(), 0);
+  EXPECT_EQ(target.output, "pending");
+}
+
+TEST(DefaultStreamBuf, OverflowReportsWriteFailureAndCanBeRetried) {
+  memory_stream target;
+  cxx11::basic_streambuf buffer(target, 1);
+  ASSERT_EQ(buffer.sputn("123456789", 9), 9);
+
+  target.max_write = 0;
+  EXPECT_EQ(buffer.sputc('x'), std::char_traits<char>::eof());
+  EXPECT_TRUE(target.output.empty());
+
+  target.max_write = (std::numeric_limits<buf_size>::max)();
+  EXPECT_EQ(buffer.pubsync(), 0);
+  EXPECT_EQ(target.output, "123456789");
+}
+
+TEST(DefaultStreamBuf, SeekCurrentAdjustsForUnreadInput) {
+  memory_stream target;
+  target.input = "abcdef";
+  cxx11::basic_streambuf buffer(target, 4);
+
+  char first[2] = {};
+  ASSERT_EQ(buffer.sgetn(first, sizeof first), sizeof first);
+  ASSERT_EQ(std::string(first, sizeof first), "ab");
+  EXPECT_EQ(buffer.pubseekoff(1, std::ios_base::cur, std::ios_base::in),
+            std::streampos(3));
+  EXPECT_EQ(target.last_seek_offset, -1);
+  EXPECT_EQ(target.last_seek_direction, seek_dirs::seek_cur);
+  EXPECT_EQ(buffer.sgetc(), 'd');
+}
+
+TEST(DefaultStreamBuf, SupportsEndAndAbsoluteSeeking) {
+  memory_stream target;
+  target.input = "abcdef";
+  cxx11::basic_streambuf buffer(target);
+
+  EXPECT_EQ(buffer.pubseekoff(0, std::ios_base::end, std::ios_base::in),
+            std::streampos(6));
+  EXPECT_EQ(buffer.pubseekpos(1, std::ios_base::in), std::streampos(1));
+  EXPECT_EQ(buffer.sgetc(), 'b');
+  EXPECT_EQ(buffer.pubseekoff(0, static_cast<std::ios_base::seekdir>(-1),
+                              std::ios_base::in),
+            std::streampos(-1));
+  EXPECT_EQ(target.seek_calls, 2);
+}
+
+TEST(DefaultStreamBuf, FailedSeekInvalidatesBufferedInput) {
+  memory_stream target;
+  target.input = "abc";
+  cxx11::basic_streambuf buffer(target);
+  ASSERT_EQ(buffer.sgetc(), 'a');
+
+  target.fail_seek = true;
+  EXPECT_EQ(buffer.pubseekpos(0, std::ios_base::in), std::streampos(-1));
+  EXPECT_EQ(buffer.sgetc(), std::char_traits<char>::eof());
+}
+
+TEST(DefaultStreamBuf, OutputSeekFlushesAndDoesNotSeekAfterFlushFailure) {
+  memory_stream target;
+  target.max_write = 0;
+  cxx11::basic_streambuf buffer(target);
+  ASSERT_EQ(buffer.sputn("x", 1), 1);
+
+  EXPECT_EQ(buffer.pubseekoff(0, std::ios_base::beg, std::ios_base::out),
+            std::streampos(-1));
+  EXPECT_EQ(target.seek_calls, 0);
+
+  target.max_write = (std::numeric_limits<buf_size>::max)();
+  EXPECT_EQ(buffer.pubseekoff(0, std::ios_base::beg, std::ios_base::out),
+            std::streampos(0));
+  EXPECT_EQ(target.output, "x");
+  EXPECT_EQ(target.seek_calls, 1);
+}
+
+TEST(DefaultStreamBuf, PropagatesSeekException) {
+  memory_stream target;
+  target.throw_on_seek = true;
+  cxx11::basic_streambuf buffer(target);
+
+  EXPECT_THROW(buffer.pubseekoff(0, std::ios_base::beg, std::ios_base::in),
+               cxx11::io_exception);
+}
+
+TEST(DefaultStreamBuf, DestructorFlushesPendingOutput) {
+  memory_stream target;
+  {
+    cxx11::basic_streambuf buffer(target);
+    ASSERT_EQ(buffer.sputn("pending", 7), 7);
+    EXPECT_TRUE(target.output.empty());
+  }
+  EXPECT_EQ(target.output, "pending");
+}
 
 TEST(ShortWrite, BufferedStreamRetriesPartialProgress) {
   partial_stream target;
