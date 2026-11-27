@@ -15,6 +15,7 @@ extern "C" {
  * and mode. filename is expressed in UTF-8 encoding.
  * Append "b" to a supported mode (for example, "r+b") to use binary mode.
  * On failure, *p_self is set to null when p_self is non-null.
+ * On Windows, malformed UTF-8 filenames are rejected.
  * @param p_self
  * @param filename
  * @param mode
