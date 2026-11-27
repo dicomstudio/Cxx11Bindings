@@ -6,7 +6,9 @@
 #include <algorithm>  // std::min
 #include <cassert>
 #include <complex>
+#include <cstddef>
 #include <cstring>  // memmove
+#include <limits>
 #include <stdexcept>
 #include <streambuf>
 #include <string>
@@ -140,9 +142,11 @@ static constexpr std::size_t put_back_size = 8;
 // basic default streambuf implementation using c11_stream
 class basic_streambuf final : public std::streambuf {
  public:
+  // buff_sz must be positive and leave room for putback within the supported
+  // callback and pointer ranges; invalid sizes throw before allocating.
   explicit basic_streambuf(stream_interface& f,
                            const std::size_t buff_sz = 4096)
-      : stream_(f), buffer_(buff_sz + put_back_size) {
+      : stream_(f), buffer_(checked_buffer_size(buff_sz)) {
     char* base = buffer_.data();
     setg(base + put_back_size, base + put_back_size, base + put_back_size);
     setp(base, base + buffer_.size());
@@ -247,6 +251,21 @@ class basic_streambuf final : public std::streambuf {
   }
 
  private:
+  static std::size_t checked_buffer_size(const std::size_t size) {
+    if (size == 0) {
+      throw std::invalid_argument("stream buffer size must be positive");
+    }
+    const uintmax_t max_total = (std::min)(
+        (std::min)(static_cast<uintmax_t>((std::numeric_limits<buf_size>::max)()),
+                   static_cast<uintmax_t>((std::numeric_limits<int>::max)())),
+        (std::min)(static_cast<uintmax_t>((std::numeric_limits<std::ptrdiff_t>::max)()),
+                   static_cast<uintmax_t>((std::numeric_limits<std::size_t>::max)())));
+    if (static_cast<uintmax_t>(size) > max_total - put_back_size) {
+      throw std::length_error("stream buffer size exceeds supported range");
+    }
+    return size + put_back_size;
+  }
+
   stream_interface& stream_;
   std::vector<char> buffer_;
 
