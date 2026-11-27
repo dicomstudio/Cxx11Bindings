@@ -2,16 +2,22 @@
 // Mostly used to expose symbols for testing purpose.
 #include <cxx11bindings/stream.h>
 
-CXX11_BINDINGS_EXPORT buf_size test_c11_stream_read(
+#ifdef CXX11_BINDINGS_TEST_MODULE
+#define CXX11_TEST_EXPORT CXX11_BINDINGS_EXPORT
+#else
+#define CXX11_TEST_EXPORT
+#endif
+
+CXX11_TEST_EXPORT buf_size test_c11_stream_read(
     struct c11_stream* c11_stream, byte* buffer, buf_size count);
-CXX11_BINDINGS_EXPORT buf_size test_c11_stream_write(
+CXX11_TEST_EXPORT buf_size test_c11_stream_write(
     struct c11_stream* c11_stream, const byte* buffer, buf_size count);
-CXX11_BINDINGS_EXPORT stream_offset test_c11_stream_seek(
+CXX11_TEST_EXPORT stream_offset test_c11_stream_seek(
     struct c11_stream* c11_stream, stream_offset off, seek_dir dir);
-CXX11_BINDINGS_EXPORT int test_c11_stream_flush(struct c11_stream* c11_stream);
-CXX11_BINDINGS_EXPORT stream_length
+CXX11_TEST_EXPORT int test_c11_stream_flush(struct c11_stream* c11_stream);
+CXX11_TEST_EXPORT stream_length
 test_c11_stream_trunc(struct c11_stream* c11_stream, stream_length size);
-CXX11_BINDINGS_EXPORT int test_c11_stream_seek_direction(void);
+CXX11_TEST_EXPORT int test_c11_stream_seek_direction(void);
 
 buf_size test_c11_stream_read(struct c11_stream* c11_stream, byte* buffer,
                               const buf_size count) {
