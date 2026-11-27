@@ -22,6 +22,9 @@ for its putback space and callback counts. Zero throws `std::invalid_argument`;
 sizes exceeding the supported range throw `std::length_error` before allocation.
 `basic_streambuf` throws `stream_exception` for a negative read result and
 uses `InvalidOperation` when a read reports more bytes than requested.
+Its destructor attempts to write buffered output but cannot report failures and
+suppresses exceptions. Call `pubsync()` explicitly while the buffer is alive
+and check its return value or handle exceptions to detect write failures.
 
 The optional compiled shared library supplies `FILE*` and `std::filebuf`
 implementations of the interface. These are useful examples or ready-made
