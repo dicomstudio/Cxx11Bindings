@@ -4,7 +4,12 @@ This is a lightweight C11 header-only library to help bind C++11 code to foreign
 
 ## Implementation details
 
-The stream abstraction is simply defined with a set of five function pointers:
+The stream interface is synchronous: each callback completes and returns its result
+before the call returns, and may block. Read and write callbacks must not access
+the supplied buffer after returning. The interface does not provide asynchronous
+completion or guarantee thread safety.
+
+The stream abstraction is defined with a set of five function pointers:
 
 ```c
 struct c11_stream {
