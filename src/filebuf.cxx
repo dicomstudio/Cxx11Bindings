@@ -79,13 +79,18 @@ static int file_flush(c11_stream* self) {
 
 namespace {
 std::ios::openmode file_mode_to_ios_flags(const char* mode) {
-  const std::string m(mode);
-  if (m == "r") return std::ios::in;
-  if (m == "r+") return std::ios::in | std::ios::out;
-  if (m == "w") return std::ios::out | std::ios::trunc;
-  if (m == "w+") return std::ios::in | std::ios::out | std::ios::trunc;
-  if (m == "a") return std::ios::out | std::ios::app;
-  if (m == "a+") return std::ios::in | std::ios::out | std::ios::app;
+  std::string m(mode);
+  std::ios::openmode binary = std::ios::openmode(0);
+  if (!m.empty() && m.back() == 'b') {
+    binary = std::ios::binary;
+    m.pop_back();
+  }
+  if (m == "r") return std::ios::in | binary;
+  if (m == "r+") return std::ios::in | std::ios::out | binary;
+  if (m == "w") return std::ios::out | std::ios::trunc | binary;
+  if (m == "w+") return std::ios::in | std::ios::out | std::ios::trunc | binary;
+  if (m == "a") return std::ios::out | std::ios::app | binary;
+  if (m == "a+") return std::ios::in | std::ios::out | std::ios::app | binary;
   // Add more cases as needed
   return std::ios::openmode(0);  // Unknown mode
 }
@@ -104,6 +109,9 @@ int file_stream_init(c11_stream** p_self, std::streambuf* streambuf,
     // success
     return 0;
   }
+  if (created) {
+    delete streambuf;
+  }
   *p_self = nullptr;
   return C11_E_POINTER;
 }
@@ -119,6 +127,7 @@ int cxx11_file_stream_create1(c11_stream** p_self, const char* filename,
       return file_stream_init(p_self, fb, true);
     }
     // else
+    delete fb;
     return C11_E_IO;
   }
   // else
@@ -150,6 +159,7 @@ int cxx11_file_stream_create2(c11_stream** p_self, const wchar_t* wfilename,
       return file_stream_init(p_self, fb, true);
     }
     // else
+    delete fb;
     return C11_E_IO;
   }
   // else
