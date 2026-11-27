@@ -178,6 +178,21 @@ if(BUILD_TESTING)
                                                   src/test_cxx11bindings.c)
     target_link_libraries(${PROJECT_NAME}_file_init_tests PRIVATE ${LIBRARY_NAME})
     add_test(NAME FileStreamInitialization COMMAND ${PROJECT_NAME}_file_init_tests)
+
+    add_executable(${PROJECT_NAME}_file_alloc_failure_tests
+                   src/test_file_alloc_failure.c)
+    target_include_directories(${PROJECT_NAME}_file_alloc_failure_tests
+                               PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
+    target_compile_definitions(${PROJECT_NAME}_file_alloc_failure_tests
+                               PRIVATE CXX11_BINDINGS_BUILD)
+    if(NOT WIN32)
+      target_compile_definitions(${PROJECT_NAME}_file_alloc_failure_tests
+                                 PRIVATE _FILE_OFFSET_BITS=64
+                                         _LARGEFILE64_SOURCE
+                                         _POSIX_C_SOURCE=200112L)
+    endif()
+    add_test(NAME FileStreamAllocationFailure
+             COMMAND ${PROJECT_NAME}_file_alloc_failure_tests)
   endif()
 
   if(C11B_BUILD_FILE AND C11B_BUILD_FILEBUF)

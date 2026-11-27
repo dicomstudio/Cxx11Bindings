@@ -75,7 +75,7 @@ static int file_stream_init(struct c11_stream** p_self, FILE* file,
     return 0;
   }
   *p_self = NULL;
-  return C11_E_POINTER;
+  return C11_E_OUTOFMEMORY;
 }
 
 int c11_file_stream_create1(struct c11_stream** p_self,
@@ -200,7 +200,7 @@ static int handle_stream_init(struct c11_stream** p_self, const HANDLE handle,
     return 0;
   }
   *p_self = NULL;
-  return C11_E_POINTER;
+  return C11_E_OUTOFMEMORY;
 }
 
 int c11_handle_stream_init(struct c11_stream** p_self, const HANDLE handle) {
@@ -269,7 +269,7 @@ static int fd_stream_init(struct c11_stream** p_self, const int fd,
     return 0;
   }
   *p_self = NULL;
-  return C11_E_POINTER;
+  return C11_E_OUTOFMEMORY;
 }
 
 int c11_fd_stream_init(struct c11_stream** p_self, int fd) {
