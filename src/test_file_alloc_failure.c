@@ -31,9 +31,13 @@ int main(void) {
 
 #ifdef _WIN32
   stream = (struct c11_stream*)1;
-  CHECK(c11_handle_stream_init(&stream, GetCurrentProcess()) ==
-        C11_E_OUTOFMEMORY);
+  HANDLE handle = CreateFileW(L"NUL", GENERIC_READ,
+                              FILE_SHARE_READ | FILE_SHARE_WRITE, NULL,
+                              OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+  CHECK(handle != INVALID_HANDLE_VALUE);
+  CHECK(c11_handle_stream_init(&stream, handle) == C11_E_OUTOFMEMORY);
   CHECK(stream == NULL);
+  CHECK(CloseHandle(handle));
 #else
   stream = (struct c11_stream*)1;
   CHECK(c11_fd_stream_init(&stream, 0) == C11_E_OUTOFMEMORY);

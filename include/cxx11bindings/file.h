@@ -69,6 +69,10 @@ CXX11_BINDINGS_EXPORT int c11_file_stream_init(struct c11_stream** p_self,
  */
 CXX11_BINDINGS_EXPORT int c11_handle_stream_init(struct c11_stream** p_self,
                                                  HANDLE handle);
+/**
+ * Destroy a c11_handle_stream wrapper without closing its borrowed handle.
+ */
+CXX11_BINDINGS_EXPORT int c11_handle_stream_destroy(struct c11_stream* self);
 #else
 /**
  * Initialize a c11_file_stream from an existing file descriptor.
@@ -79,6 +83,10 @@ CXX11_BINDINGS_EXPORT int c11_handle_stream_init(struct c11_stream** p_self,
  */
 CXX11_BINDINGS_EXPORT int c11_fd_stream_init(struct c11_stream** p_self,
                                              int fd);
+/**
+ * Destroy a c11_fd_stream wrapper without closing its borrowed descriptor.
+ */
+CXX11_BINDINGS_EXPORT int c11_fd_stream_destroy(struct c11_stream* self);
 #endif
 
 #ifdef __cplusplus
