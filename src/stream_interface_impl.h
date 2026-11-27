@@ -34,16 +34,8 @@ static inline buf_size fread_file_fp(FILE* stream, byte* buffer,
     return C11_E_INVALIDARG;
   }
   const size_t read = fread(buffer, 1, (size_t)count, stream);
-  if (read < (size_t)count) {
-    const int err = ferror(stream);
-    if (err) {
-      // An error occurred
-      if (err == EPERM) {
-        return C11_E_NOTSUPPORTED;
-      }
-      // else
-      return C11_E_IO;
-    }
+  if (read == 0 && count > 0 && ferror(stream)) {
+    return C11_E_IO;
   }
   // short-read ok:
   return (buf_size)read;
@@ -91,7 +83,7 @@ static inline int fseek_file_fp(FILE* stream, const int64_t offset,
 #else
   const int ret = fseeko(stream, offset, whence);
 #endif
-  if (ret < 0) {
+  if (ret != 0) {
     if (errno == EINVAL) {
       // Invalid offset or whence
       return C11_E_INVALIDARG;
@@ -103,6 +95,9 @@ static inline int fseek_file_fp(FILE* stream, const int64_t offset,
 }
 
 static inline int64_t ftell_file_fp(FILE* stream) {
+  if (!stream) {
+    return C11_E_POINTER;
+  }
 #ifdef _WIN32
   const int64_t ret = _ftelli64(stream);
 #else
@@ -121,14 +116,14 @@ static inline int fflush_file_fp(FILE* stream) {
   const int ret = fflush(stream);
   // Otherwise, EOF is returned and errno is set to indicate the error.
   // EBADF  stream is not an open stream, or is not open for writing.
-  if (ret < 0) {
+  if (ret != 0) {
     return C11_E_IO;
   }
   return ret;
 }
 
 // Truncate an open FILE* stream to a given size (in bytes).
-// Returns new size on success, -1 on error.
+// Returns new size on success, or a negative C11 error code.
 static inline int64_t ftruncate_file_fp(FILE* fp, int64_t new_size) {
   if (!fp) {
     return C11_E_POINTER;
@@ -137,14 +132,15 @@ static inline int64_t ftruncate_file_fp(FILE* fp, int64_t new_size) {
     return C11_E_INVALIDARG;
   }
 
-#ifndef _WIN32
-  // POSIX fflush discards unread input that fseek may retain in its buffer.
-  // clang only ?
+  const int seek_ret = fseek_file_fp(fp, 0, seek_cur);
+  if (seek_ret < 0) {
+    return seek_ret;
+  }
+  // POSIX fflush also discards unread input that fseek may retain.
   const int flush_ret = fflush_file_fp(fp);
   if (flush_ret < 0) {
     return flush_ret;
   }
-#endif
 
 #ifdef _WIN32
   const int fd = _fileno(fp);
